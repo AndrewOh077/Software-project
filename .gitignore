@@ -1,0 +1,42 @@
+# ---- Secrets (NEVER commit) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- OS / editor junk ----
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# ---- Docker / data volumes ----
+monitoring/prometheus/data/
+monitoring/grafana/data/
+redis-data/
+
+# ---- Experiment raw output (keep summaries, ignore huge raw files) ----
+experiments/results/raw/
+*.log
+locust_*.csv
+
+# ---- ML models (too big for git) ----
+ai/models/*.pkl
+ai/models/*.joblib
