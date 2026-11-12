@@ -10,3 +10,6 @@ app = FastAPI(
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+@app.get("/")
+async def home():
+    return {"message": "Welcome to ResiliGuard Gateway"}
