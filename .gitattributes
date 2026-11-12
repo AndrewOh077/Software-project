@@ -1,0 +1,5 @@
+# Force Unix line endings so bash scripts (chaos.sh) work on Windows/WSL teammates too.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
