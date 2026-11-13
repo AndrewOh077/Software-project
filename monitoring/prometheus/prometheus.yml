@@ -1,0 +1,22 @@
+# Prometheus = a robot that visits every service's /metrics page every few seconds
+# and saves the numbers with a timestamp, so we can draw graphs over time.
+
+global:
+  scrape_interval: 5s      # visit every 5 seconds (fast enough to see a server die)
+  evaluation_interval: 5s
+
+scrape_configs:
+  # The front door. Real gateway (Person 2) or the stub — both live at "gateway:8000".
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway:8000"]
+
+  # App servers. Real ones (Person 1) or fakes — both live at app-N:8000.
+  - job_name: app
+    static_configs:
+      - targets: ["app-1:8000", "app-2:8000", "app-3:8000"]
+
+  # Week 4+: the self-healing controller (Person 1). Uncomment when it exposes /metrics.
+  # - job_name: controller
+  #   static_configs:
+  #     - targets: ["controller:8000"]
