@@ -1,0 +1,13 @@
+# Tells Grafana to load every dashboard JSON file in /var/lib/grafana/dashboards on startup.
+# Edit a dashboard in the Grafana UI -> Share -> Export -> save JSON over the file in
+# monitoring/grafana/dashboards/ -> commit. That's how dashboards live in git.
+apiVersion: 1
+
+providers:
+  - name: ResiliGuard
+    folder: ResiliGuard
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
