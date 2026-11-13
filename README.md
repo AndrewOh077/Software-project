@@ -3,7 +3,7 @@
 > A local system that keeps a website alive under traffic spikes and server failures —
 > it detects broken servers, routes around them, restarts them, and explains what happened.
 
-**Status:** 🚧 Week 0 — repo setup and API contracts
+**Status:** 🚧 Week 3 — monitoring, dashboards and load tests running on fake services
 
 ---
 
@@ -69,20 +69,26 @@ monitoring/     Prometheus + Grafana config                            — Perso
 loadtest/       Locust scenarios                                       — Person 3
 ai/             Anomaly detection + LLM incident assistant             — Person 3
 experiments/    MTTR calculator, mode A/B/C runs, results              — Person 3
+fakes/          Fake app servers + stub gateway (test doubles)          — Person 3
 docs/           Contracts, decisions, architecture, team plan          — Everyone
 tests/          Automated tests (run in CI)                            — Everyone
 ```
 
 ## Quick start
 
-> Works once Week 1–2 is done. Until then, only the docs exist.
+Right now the stack runs on **fake** app servers and a **stub** gateway (see `fakes/`),
+so monitoring and load tests work before the real services are finished.
 
 ```bash
 git clone https://github.com/AndrewOh077/Software-project.git
 cd Software-project
 cp .env.example .env          # fill in your own values, never commit .env
-docker compose up --build
+make up                       # = docker compose -f docker-compose.dev.yml up -d --build
+make failure                  # kill app-2 while traffic flows, watch Grafana
+make down
 ```
+
+More: [`docs/person3-guide.md`](docs/person3-guide.md)
 
 | Service | URL |
 |---|---|

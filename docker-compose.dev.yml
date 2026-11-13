@@ -1,0 +1,93 @@
+# Person 3 dev stack: FAKE app servers + STUB gateway + Prometheus + Grafana + Locust.
+#
+# Why a separate file? Person 1 owns the real docker-compose.yml (real app servers).
+# This one lets monitoring and load tests be built in parallel, before the real services exist.
+# When the real services land, the prometheus/grafana/locust blocks move into the main file
+# unchanged — they only depend on the names "gateway" and "app-1..3" (docs/contracts.md).
+#
+#   make up        start everything            make down      stop everything
+#   make normal    scenario 1                  make spike     scenario 2
+#   make failure   scenario 3 (kills app-2)
+#
+#   Grafana    http://localhost:3000   (no login, dashboard "ResiliGuard — Overview")
+#   Prometheus http://localhost:9090
+#   Gateway    http://localhost:8000   Apps: http://localhost:8001 / 8002 / 8003
+#   Locust UI  http://localhost:8089   (only while `make locust-ui` runs)
+
+x-fake-app: &fake-app
+  build:
+    context: .
+    dockerfile: fakes/Dockerfile
+  environment: &fake-app-env
+    READY_DELAY_SEC: "3"
+    BASE_LATENCY_MS: "20"
+  restart: unless-stopped
+
+services:
+  app-1:
+    <<: *fake-app
+    environment: { <<: *fake-app-env, SERVER_ID: app-1 }
+    ports: ["8001:8000"]
+
+  app-2:
+    <<: *fake-app
+    environment: { <<: *fake-app-env, SERVER_ID: app-2 }
+    ports: ["8002:8000"]
+
+  app-3:
+    <<: *fake-app
+    environment: { <<: *fake-app-env, SERVER_ID: app-3 }
+    ports: ["8003:8000"]
+
+  gateway:
+    build:
+      context: .
+      dockerfile: fakes/Dockerfile
+    command: ["uvicorn", "fakes.stub_gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      BACKENDS: "app-1=http://app-1:8000,app-2=http://app-2:8000,app-3=http://app-3:8000"
+      HEALTH_CHECK_INTERVAL_SEC: "1"
+      HEALTH_CHECK_FAIL_THRESHOLD: "3"
+      RATE_LIMIT_RPS: "${RATE_LIMIT_RPS:-0}"   # 0 = off. Try: RATE_LIMIT_RPS=60 make up
+      EVENTS_FILE: /results/events.jsonl
+    volumes:
+      - ./experiments/results/raw:/results
+    ports: ["8000:8000"]
+    depends_on: [app-1, app-2, app-3]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+    depends_on: [gateway]
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/resiliguard-overview.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  # Not started by `make up`. Used by `make normal|spike|failure|locust-ui`.
+  locust:
+    image: locustio/locust:2.32.4
+    profiles: ["loadtest"]
+    working_dir: /mnt/locust
+    environment:
+      EVENTS_FILE: /results/events.jsonl
+      CHAOS_TARGET: http://app-2:8000
+      CHAOS_SERVER_ID: app-2
+      SCENARIO_SCALE: "${SCENARIO_SCALE:-1}"
+    volumes:
+      - ./loadtest:/mnt/locust:ro
+      - ./experiments/results/raw:/results
+    ports: ["8089:8089"]
+    depends_on: [gateway]
