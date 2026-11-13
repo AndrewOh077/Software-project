@@ -33,3 +33,28 @@ Format:
 **Chose:** Run everything locally with Docker Compose.
 **Instead of:** Deploying to AWS/GCP from the start.
 **Why:** C$0 cost, anyone can reproduce it from the README.
+
+## D-005 — Build monitoring against fakes first  (2026-11-13, Person 3)
+**Chose:** Fake app servers + a stub gateway that speak the exact contracts.
+**Instead of:** Waiting for the real app servers and gateway.
+**Why:** All three people work in parallel (timeline Week 1–3). Because everything depends only on the contract names, swapping in the real services changes nothing in Prometheus, Grafana or Locust.
+
+## D-006 — Grafana dashboard as code  (2026-11-13, Person 3)
+**Chose:** A Python script generates the dashboard JSON; a test checks it is up to date.
+**Instead of:** Clicking panels in the Grafana UI and exporting.
+**Why:** Every PromQL query is reviewable in a PR, and a test fails if a panel uses a metric name that is not in docs/contracts.md.
+
+## D-007 — 1 Locust user ≈ 1 request per second  (2026-11-13, Person 3)
+**Chose:** `constant_pacing(1)` for every user.
+**Instead of:** Random waits between requests.
+**Why:** "150 users" then means "about 150 req/s", which makes scenarios and graphs easy to compare and explain.
+
+## D-008 — Count on-purpose rejections separately from errors  (2026-11-13, Person 3)
+**Chose:** A 429/503 is a "rejection" only if its body has the Contract 5a `error` field; anything else is an error.
+**Instead of:** Treating every non-200 as a failure.
+**Why:** During a spike, a fast 429 means protection is working. Mixing it with crashes would make Mode B look worse than Mode A.
+
+## D-009 — Readiness is not liveness  (2026-11-13, Person 3)
+**Chose:** In the stub gateway, "warming up" or "overloaded" pauses traffic but does not count as a failure or write an incident event.
+**Instead of:** Treating every non-ready answer as dead.
+**Why:** Otherwise every restart or startup pollutes events.jsonl and makes the MTTR numbers wrong.
