@@ -1,0 +1,13 @@
+{"ts": "2026-11-20T15:00:00.000Z", "source": "gateway", "event": "backend_marked_unhealthy", "server_id": "app-1", "detail": {"note": "startup noise: before any kill, must be ignored"}}
+{"ts": "2026-11-20T15:00:03.000Z", "source": "gateway", "event": "backend_marked_healthy", "server_id": "app-1", "detail": {}}
+{"ts": "2026-11-20T15:01:00.000Z", "source": "chaos", "event": "server_killed", "server_id": "app-2", "detail": {"incident": "A: normal recovery"}}
+{"ts": "2026-11-20T15:01:01.500Z", "source": "gateway", "event": "backend_marked_unhealthy", "server_id": "app-2", "detail": {}}
+{"ts": "2026-11-20T15:01:05.000Z", "source": "gateway", "event": "backend_marked_unhealthy", "server_id": "app-3", "detail": {"note": "different server, must not affect app-2"}}
+{"ts": "2026-11-20T15:01:06.000Z", "source": "gateway", "event": "backend_marked_healthy", "server_id": "app-3", "detail": {}}
+{"ts": "2026-11-20T15:01:20.000Z", "source": "gateway", "event": "backend_marked_healthy", "server_id": "app-2", "detail": {}}
+this line is broken on purpose
+{"ts": "2026-11-20T15:03:00.000Z", "source": "chaos", "event": "server_killed", "server_id": "app-1", "detail": {"incident": "B: slower recovery"}}
+{"ts": "2026-11-20T15:03:02.000Z", "source": "gateway", "event": "backend_marked_unhealthy", "server_id": "app-1", "detail": {}}
+{"ts": "2026-11-20T15:03:40.000Z", "source": "gateway", "event": "backend_marked_healthy", "server_id": "app-1", "detail": {}}
+{"ts": "2026-11-20T15:05:00.000Z", "source": "chaos", "event": "server_killed", "server_id": "app-3", "detail": {"incident": "C: never recovers"}}
+{"ts": "2026-11-20T15:05:01.000Z", "source": "gateway", "event": "backend_marked_unhealthy", "server_id": "app-3", "detail": {}}

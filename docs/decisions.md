@@ -58,3 +58,8 @@ Format:
 **Chose:** In the stub gateway, "warming up" or "overloaded" pauses traffic but does not count as a failure or write an incident event.
 **Instead of:** Treating every non-ready answer as dead.
 **Why:** Otherwise every restart or startup pollutes events.jsonl and makes the MTTR numbers wrong.
+
+## D-010 — MTTR is measured from the event log, not from Grafana  (2026-11-14, Person 3)
+**Chose:** Compute MTTR from `events.jsonl` timestamps (`server_killed` → `backend_marked_healthy`).
+**Instead of:** Reading it off Prometheus graphs.
+**Why:** Prometheus only samples every 5 s, so MTTR from graphs is off by up to 5 s. Event timestamps are exact to the millisecond, and the same file works for every mode (A/B/C) and every run.

@@ -5,7 +5,7 @@ COMPOSE = docker compose -f docker-compose.dev.yml
 LOCUST  = $(COMPOSE) run --rm --service-ports locust
 RESULTS = /results
 
-.PHONY: up down logs ps normal spike failure locust-ui test lint dashboard
+.PHONY: up down logs ps normal spike failure mttr locust-ui test lint dashboard
 
 up:            ## start fake apps, stub gateway, Prometheus, Grafana
 	$(COMPOSE) up -d --build
@@ -34,6 +34,10 @@ spike:         ## scenario 2: 10 -> 150 -> 10 users
 failure:       ## scenario 3: kill app-2 at 60s, bring it back at 120s
 	$(LOCUST) -f scenario_failure.py --headless --host http://gateway:8000 \
 		--csv $(RESULTS)/failure --only-summary
+
+mttr:          ## Week 4: MTTR report from the last failure run (also saves a CSV)
+	python experiments/mttr.py experiments/results/raw/events.jsonl \
+		--csv experiments/results/raw/mttr.csv
 
 locust-ui:     ## open the Locust web UI at http://localhost:8089 (pick users yourself)
 	$(LOCUST) -f scenario_normal.py --host http://gateway:8000

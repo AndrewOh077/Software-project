@@ -86,8 +86,35 @@ Checklist for real services to "plug in":
 2. `make dashboard` → rewrites the JSON
 3. `make test` — fails if the JSON is stale or a query uses a metric not in the contract
 
-## Next for Person 3 (Week 4–5)
+## Week 4: MTTR calculator
 
-- MTTR calculator: read `events.jsonl`, pair `server_killed` → next `backend_marked_healthy`
-  for the same `server_id` (sample data already produced by `make failure`)
-- Mode A vs Mode B baseline runs with these same 3 scenarios
+`experiments/mttr.py` reads `events.jsonl` and, for every `server_killed`, finds the next
+`backend_marked_unhealthy` and `backend_marked_healthy` for the **same** server.
+
+```
+server_killed ──► backend_marked_unhealthy ──► backend_marked_healthy
+     t0                    t1                          t2
+detection time = t1 - t0        MTTR = t2 - t0   (docs/contracts.md definition)
+```
+
+```bash
+make failure     # produces events.jsonl
+make mttr        # prints the report + saves experiments/results/raw/mttr.csv
+python experiments/mttr.py experiments/sample_data/events_sample.jsonl   # fake log demo
+```
+
+Example output (real run, 2026-11-13):
+
+```
+ #  server   killed at (UTC)          detected      MTTR
+ 1  app-2    2026-11-13 14:59:46.300     0.18s    15.24s
+```
+
+Rules it follows: events before a kill are ignored (startup noise), other servers don't count,
+broken lines are skipped and reported, a server killed again before recovering leaves the first
+incident as NOT RECOVERED (excluded from the mean, shown in the count).
+
+## Next for Person 3 (Week 5)
+
+- Mode A (no protection) vs Mode B (rules) baseline runs with the same 3 scenarios
+- Use `mttr.py --json` to put MTTR next to Locust's error rate and p99 per mode

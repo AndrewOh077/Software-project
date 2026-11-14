@@ -6,7 +6,7 @@
 | 1–2 | 3 app servers + Docker Compose, `/health` `/ready` `/metrics` | Gateway skeleton + round robin (test with fake servers) | ✅ Fake server + Locust, Prometheus + Grafana connected |
 | 3 | Chaos script (kill servers on purpose) | Health check + exclude dead servers, `/admin` API | ✅ 3 Locust scenarios, gateway graphs in Grafana |
 | 3 (Fri) | **Integration #1:** kill one server, the others keep answering | ← | ← |
-| 4 | Controller v1: detect → restart → return | Token bucket + priority + queue (429 / 503) | MTTR calculator (built on fake logs first) |
+| 4 | Controller v1: detect → restart → return | Token bucket + priority + queue (429 / 503) | ✅ MTTR calculator (built on fake logs first) |
 | 5 | Restart limit + Emergency Mode | AIMD + circuit breaker | Baseline runs: Mode A (no protection) vs Mode B (rules) |
 | 6 | **Together:** integration week — pass all 8 scenarios (no new features) | ← | ← |
 | 7 | GitHub Actions chaos test | Bug fixes, measure throughput limit | Finish dashboard, save test results |
