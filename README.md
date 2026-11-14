@@ -55,7 +55,7 @@ Results will be filled in Week 11–12. See [`experiments/`](experiments/).
 | Monitoring | Prometheus, Grafana |
 | Load testing | Locust |
 | ML | scikit-learn, pandas, NumPy |
-| LLM (optional) | Claude / OpenAI API or Ollama (local) |
+| LLM (optional) | Hosted LLM API or Ollama (local) |
 | CI | GitHub Actions |
 
 ## Repo layout
