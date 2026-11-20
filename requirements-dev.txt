@@ -1,6 +1,7 @@
 # Tools every teammate needs for linting and testing.
 -r fakes/requirements.txt
 -r loadtest/requirements.txt
+-r ai/requirements.txt
 ruff==0.7.4
 pytest==8.3.3
 pyyaml==6.0.2

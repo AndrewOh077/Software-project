@@ -63,3 +63,8 @@ Format:
 **Chose:** Compute MTTR from `events.jsonl` timestamps (`server_killed` → `backend_marked_healthy`).
 **Instead of:** Reading it off Prometheus graphs.
 **Why:** Prometheus only samples every 5 s, so MTTR from graphs is off by up to 5 s. Event timestamps are exact to the millisecond, and the same file works for every mode (A/B/C) and every run.
+
+## D-011 — AI watches error ratio and p95 latency, trained on a clean run  (2026-11-20, Person 3)
+**Chose:** Two numbers per server every 5 s (5xx share, p95 latency). Both detectors learn "normal" from one normal-scenario run only. Default live detector: z-score, alert after 2 bad samples in a row.
+**Instead of:** Request rate (a traffic spike is not a sick server), or Isolation Forest as the default.
+**Why:** On real fake-stack runs both detectors caught the hidden 30%-error fault in 14 s with 0 false alarms, but Isolation Forest still raised 1 false alarm during the spike. With only two features the forest adds nothing; revisit when we add more features. Kills stay the health check's job (0.1 s).

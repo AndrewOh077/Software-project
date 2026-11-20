@@ -1,0 +1,3 @@
+# Week 8–9 anomaly detection (z-score uses numpy, Isolation Forest uses scikit-learn)
+scikit-learn==1.9.1
+numpy>=2.0

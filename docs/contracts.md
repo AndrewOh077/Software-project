@@ -165,7 +165,7 @@ One JSON object per line in `experiments/results/raw/events.jsonl` — Person 3'
 
 | `event` | Written by |
 |---|---|
-| `server_killed`, `latency_injected`, `cpu_stress_started` | chaos |
+| `server_killed`, `latency_injected`, `errors_injected`, `cpu_stress_started` | chaos |
 | `backend_marked_unhealthy`, `backend_marked_healthy` | gateway |
 | `restart_started`, `restart_succeeded`, `restart_failed`, `emergency_mode_on`, `emergency_mode_off` | controller |
 | `anomaly_detected`, `action_suggested` | ai |
@@ -179,3 +179,4 @@ One JSON object per line in `experiments/results/raw/events.jsonl` — Person 3'
 | Date | Change | Approved by |
 |---|---|---|
 | | Initial draft | |
+| 2026-11-20 | Add `errors_injected` chaos event (`detail.error_rate`, `detail.duration_sec`); `latency_injected` also carries `detail.duration_sec` so the AI evaluation knows when a fault ends | proposed by Person 3 |

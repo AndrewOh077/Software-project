@@ -10,7 +10,7 @@
 | 5 | Restart limit + Emergency Mode | AIMD + circuit breaker | Baseline runs: Mode A (no protection) vs Mode B (rules) |
 | 6 | **Together:** integration week — pass all 8 scenarios (no new features) | ← | ← |
 | 7 | GitHub Actions chaos test | Bug fixes, measure throughput limit | Finish dashboard, save test results |
-| 8–9 | Connect "early warning" to controller | AI control API + Safety Controller | z-score → Isolation Forest, measure false positives |
+| 8–9 | Connect "early warning" to controller | AI control API + Safety Controller | ✅ z-score → Isolation Forest, measure false positives |
 | 10 | Incident log collector (optional) | Admin approval flow (optional) | LLM root-cause + postmortem (optional) |
 | 11–12 | CI + "can a stranger reproduce it?" check | README + architecture diagram | Final 3-mode experiment + result graphs |
 | 12 | **Together:** demo video | ← | ← |

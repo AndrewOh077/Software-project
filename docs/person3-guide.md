@@ -114,7 +114,18 @@ Rules it follows: events before a kill are ignored (startup noise), other server
 broken lines are skipped and reported, a server killed again before recovering leaves the first
 incident as NOT RECOVERED (excluded from the mean, shown in the count).
 
-## Next for Person 3 (Week 5)
+## Still to do for Person 3 (Week 5–7)
 
 - Mode A (no protection) vs Mode B (rules) baseline runs with the same 3 scenarios
 - Use `mttr.py --json` to put MTTR next to Locust's error rate and p99 per mode
+
+## Week 8–9: AI early warning
+
+The new scenario `make sick` makes app-3 fail 30% of requests while `/ready` still says yes.
+The gateway keeps sending it traffic, so users see errors and the health check never notices.
+
+1. `make ai-normal`: learn "normal" from a clean run.
+2. `make ai-eval`: run the sick scenario, score both detectors, open `experiments/results/ai-report.html`.
+3. `make ai-watch`: the live version for Person 1's controller to read (`anomaly_detected` in `events.jsonl`).
+
+Details and results: `ai/README.md`. Decision: D-011.
