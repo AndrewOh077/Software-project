@@ -403,6 +403,13 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 ],
                 "faults": [f.__dict__ for f in faults],
+                "model": {
+                    "features": list(FEATURES),
+                    "mean": [round(float(v), 4) for v in det.mean],
+                    "std": [round(float(v), 4) for v in det.std],
+                    "z_limit": Z_LIMIT,
+                    "step_sec": STEP_SEC,
+                },
             }
             a.json.write_text(json.dumps(out, indent=1, default=float))
             print(f"\nsaved {a.json}")

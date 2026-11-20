@@ -9,7 +9,7 @@ server looks sick. The AI only reports; it never acts (actions are Contract 5c, 
 | File | What it does |
 |---|---|
 | `anomaly.py` | pull metrics from Prometheus, z-score + Isolation Forest, evaluate, live watch |
-| `report.py` + `report.css` | turn evaluation results into one HTML page |
+| `report.py` + `report.css` | turn evaluation results into one HTML page: a tab per run, error and latency charts with alerts marked, a readout under the pointer (arrow keys work too), works with JavaScript off |
 | `requirements.txt` | numpy, scikit-learn |
 
 ## Run it (after `make up`)

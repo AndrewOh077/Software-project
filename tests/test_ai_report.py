@@ -45,7 +45,32 @@ def test_report_shows_the_hidden_fault(tmp_path):
 
 def test_report_without_a_fault_says_so(tmp_path):
     page = run_cli(tmp_path, with_fault=False)
-    assert "No hidden fault in these runs." in page and "<svg" not in page
+    assert "No hidden fault in these runs." in page
+    assert "No fault was injected" in page and "No alerts in this run." in page
+
+
+def test_report_has_tabs_steps_alerts_and_works_without_js(tmp_path):
+    page = run_cli(tmp_path, with_fault=True)
+    assert 'role="tab"' in page and 'role="tabpanel"' in page
+    assert "How it decides" in page and "Learn normal" in page  # model numbers from evaluate
+    assert "app-3, z-score: errors 30%" in page  # alert list = the chart in words
+    assert " hidden" not in page.split("<script>")[0].split("<body>")[1]  # JS hides, not HTML
+
+
+def test_chart_does_not_draw_across_a_gap():
+    rows = [
+        {
+            "ts": t,
+            "server_id": "app-2",
+            "err_ratio": 0.0,
+            "p95_ms": 40.0,
+            "z_flag": False,
+            "forest_flag": False,
+        }
+        for t in (0, 5, 10, 60, 65)  # no samples between 10 s and 60 s (server was removed)
+    ]
+    svg = report.chart({"timeline": rows, "faults": []}, "err_ratio", "test")
+    assert svg.count("<polyline") == 2
 
 
 def test_report_needs_name_equals_path():
