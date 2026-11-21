@@ -74,6 +74,13 @@ def test_both_detectors_catch_errors_and_slowness(det, bad):
     assert det.forest_flags([bad]) == [True]
 
 
+def test_faster_or_cleaner_than_normal_is_not_sick(det):
+    # found in a real spike run: a few very fast requests at the end looked "odd" (z = -4)
+    fast = row(0, p95=10)
+    assert det.zscore_flags([fast]) == [False]
+    assert det.forest_flags([fast]) == [False]
+
+
 def test_forest_is_not_blind_to_a_feature_that_never_moved_in_training(det):
     # err_ratio was 0 in every training row; without jitter the forest never cuts on it
     assert det.forest_scores([row(0, err=0.3)])[0] < det.forest_scores([row(0)])[0]

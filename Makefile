@@ -5,7 +5,7 @@ COMPOSE = docker compose -f docker-compose.dev.yml
 LOCUST  = $(COMPOSE) run --rm --service-ports locust
 RESULTS = /results
 
-.PHONY: up down logs ps normal spike failure sick mttr ai-normal ai-eval ai-watch locust-ui test lint dashboard
+.PHONY: up down logs ps normal spike failure sick mttr results compare ai-normal ai-eval ai-watch locust-ui test lint dashboard
 
 up:            ## start fake apps, stub gateway, Prometheus, Grafana
 	$(COMPOSE) up -d --build
@@ -36,12 +36,19 @@ failure:       ## scenario 3: kill app-2 at 60s, bring it back at 120s
 		--csv $(RESULTS)/failure --only-summary
 
 sick:          ## scenario 4: app-3 fails 30% of requests from 60s to 120s but says "ready"
-	$(LOCUST) -f scenario_sick.py --headless --host http://gateway:8000 \
-		--csv $(RESULTS)/sick --only-summary
+	$(COMPOSE) run --rm -e CHAOS_TARGET=http://app-3:8000 -e CHAOS_SERVER_ID=app-3 locust \
+		-f scenario_sick.py --headless --host http://gateway:8000 --csv $(RESULTS)/sick --only-summary
 
 mttr:          ## Week 4: MTTR report from the last failure run (also saves a CSV)
 	python experiments/mttr.py experiments/results/raw/events.jsonl \
 		--csv experiments/results/raw/mttr.csv
+
+# ---- Everything at once (Week 5 + 7 + 8–9). About 25 min; SCENARIO_SCALE=0.3 for a quick try ----
+results:       ## Mode A vs B baseline, train + score the AI, save every result file
+	bash experiments/run_all.sh
+
+compare:       ## Week 5: rebuild the Mode A vs Mode B table from runs already saved
+	python experiments/compare_modes.py experiments/results/raw --out experiments/results/mode-baseline.md
 
 # ---- Week 8–9: AI early warning (needs `make up`; Prometheus at localhost:9090) ----
 RAW = experiments/results/raw
@@ -56,7 +63,7 @@ ai-eval:       ## run the sick scenario, score both detectors, build the HTML re
 	python -m ai.anomaly collect --minutes 3.5 --out $(RAW)/sick_metrics.csv
 	python -m ai.anomaly evaluate $(RAW)/sick_metrics.csv $(RAW)/events.jsonl \
 		--json $(RAW)/sick_eval.json
-	python -m ai.report experiments/results/ai-report.html sick=$(RAW)/sick_eval.json
+	python -m ai.report $(RAW)/ai-report-sick.html sick=$(RAW)/sick_eval.json
 
 ai-watch:      ## live early warning: writes anomaly_detected to events.jsonl
 	EVENTS_FILE=$(RAW)/events.jsonl python -m ai.anomaly watch

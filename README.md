@@ -3,7 +3,7 @@
 > A local system that keeps a website alive under traffic spikes and server failures —
 > it detects broken servers, routes around them, restarts them, and explains what happened.
 
-**Status:** 🚧 Week 3 — monitoring, dashboards and load tests running on fake services
+**Status:** 🚧 Person 3 through Week 9 on fake services: monitoring, load tests, Mode A/B baseline, MTTR, AI early warning (`make up && make results`). Week 6 integration waits for the real gateway and controller.
 
 ---
 

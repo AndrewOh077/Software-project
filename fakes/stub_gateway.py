@@ -104,7 +104,7 @@ def create_app(
     fail_threshold: int | None = None,
     check_interval_sec: float | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
-    run_health_checks: bool = True,
+    run_health_checks: bool | None = None,
 ) -> FastAPI:
     backends = (
         backends
@@ -119,6 +119,9 @@ def create_app(
     limiter = FixedWindowLimiter(
         rate_limit_rps if rate_limit_rps is not None else int(os.getenv("RATE_LIMIT_RPS", "0"))
     )
+    # Week 5 baseline: HEALTH_CHECKS=off is Mode A (no protection: dead servers keep traffic)
+    if run_health_checks is None:
+        run_health_checks = os.getenv("HEALTH_CHECKS", "on") != "off"
     fail_threshold = fail_threshold or int(os.getenv("HEALTH_CHECK_FAIL_THRESHOLD", "3"))
     check_interval_sec = check_interval_sec or float(os.getenv("HEALTH_CHECK_INTERVAL_SEC", "2"))
 

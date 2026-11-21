@@ -16,6 +16,12 @@ scrape_configs:
     static_configs:
       - targets: ["app-1:8000", "app-2:8000", "app-3:8000"]
 
+  # Week 8–9 AI early warning (`make ai-watch` runs on your machine, not in Docker).
+  # Shows DOWN in Grafana's "up" panel while ai-watch isn't running. That's expected.
+  - job_name: ai
+    static_configs:
+      - targets: ["host.docker.internal:8010"]
+
   # Week 4+: the self-healing controller (Person 1). Uncomment when it exposes /metrics.
   # - job_name: controller
   #   static_configs:

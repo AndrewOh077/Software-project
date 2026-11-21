@@ -7,7 +7,8 @@
 #
 #   make up        start everything            make down      stop everything
 #   make normal    scenario 1                  make spike     scenario 2
-#   make failure   scenario 3 (kills app-2)
+#   make failure   scenario 3 (kills app-2)     make sick      scenario 4 (app-3 fails quietly)
+#   make results   everything Person 3 measures, in one go (about 25 min)
 #
 #   Grafana    http://localhost:3000   (no login, dashboard "ResiliGuard — Overview")
 #   Prometheus http://localhost:9090
@@ -49,6 +50,7 @@ services:
       HEALTH_CHECK_INTERVAL_SEC: "1"
       HEALTH_CHECK_FAIL_THRESHOLD: "3"
       RATE_LIMIT_RPS: "${RATE_LIMIT_RPS:-0}"   # 0 = off. Try: RATE_LIMIT_RPS=60 make up
+      HEALTH_CHECKS: "${HEALTH_CHECKS:-on}"    # off = Mode A, no protection (Week 5 baseline)
       EVENTS_FILE: /results/events.jsonl
     volumes:
       - ./experiments/results/raw:/results
@@ -61,6 +63,7 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports: ["9090:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]   # lets it reach `make ai-watch` on your Mac
     depends_on: [gateway]
 
   grafana:

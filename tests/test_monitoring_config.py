@@ -14,21 +14,16 @@ import build_dashboard  # noqa: E402
 
 DASHBOARD = ROOT / "monitoring/grafana/dashboards/resiliguard-overview.json"
 
-# Contract 4 metric names + Prometheus' own "up".
-CONTRACT_METRICS = {
-    "http_requests_total",
-    "http_request_duration_seconds",
-    "app_in_flight_requests",
-    "gateway_backend_healthy",
-    "gateway_rejected_total",
-    "gateway_queue_length",
-    "gateway_rate_limit_current",
-    "controller_restarts_total",
-    "controller_emergency_mode",
-    "up",
-}
+# Contract 4 metric names, read from the contract itself (so a new row there is enough),
+# plus Prometheus' own "up".
+_contract = (ROOT / "docs/contracts.md").read_text()
+_metrics_table = _contract.split("## Contract 4")[1].split("Useful PromQL")[0]
+CONTRACT_METRICS = set(re.findall(r"^\| `([a-z_]+)` \|", _metrics_table, re.M)) | {"up"}
 PROMQL_FUNCS = {
     "sum",
+    "max",
+    "abs",
+    "feature",
     "rate",
     "histogram_quantile",
     "by",

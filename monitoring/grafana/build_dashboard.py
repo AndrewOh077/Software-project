@@ -358,6 +358,42 @@ def build() -> dict:
         )
     )
 
+    # ---------------- Row 3: AI early warning (Week 8–9, `make ai-watch`) ----------------
+    p.append(row("AI early warning — servers that look sick but still say ready", 50))
+    sick = up_down_timeline(
+        "AI verdict per server",
+        "max by (server_id) (ai_anomaly_flag)",
+        "{{server_id}}",
+        0,
+        51,
+        desc="From `make ai-watch`. SICK = two odd samples in a row (z-score > 3 on error ratio "
+        "or p95). Empty = ai-watch is not running.",
+    )
+    sick["fieldConfig"]["defaults"]["thresholds"]["steps"] = [
+        {"color": "green", "value": None},
+        {"color": "red", "value": 1},
+    ]
+    sick["fieldConfig"]["defaults"]["mappings"][0]["options"] = {
+        "0": {"text": "OK", "color": "green"},
+        "1": {"text": "SICK", "color": "red"},
+    }
+    p.append(sick)
+    z = timeseries(
+        "How far from normal (z-score, 3 = alarm line)",
+        [target("max by (server_id) (ai_anomaly_zscore)", "{{server_id}}")],
+        12,
+        51,
+        h=6,
+        desc="The bigger of the two z-scores (error ratio, p95) per server. Above 3 = odd. "
+        "Below 0 = better than normal (fewer errors, faster): never an alarm.",
+    )
+    z["fieldConfig"]["defaults"]["custom"]["thresholdsStyle"] = {"mode": "line"}
+    z["fieldConfig"]["defaults"]["thresholds"] = {
+        "mode": "absolute",
+        "steps": [{"color": "transparent", "value": None}, {"color": "red", "value": 3}],
+    }
+    p.append(z)
+
     return {
         "uid": "resiliguard-overview",
         "title": "ResiliGuard — Overview",

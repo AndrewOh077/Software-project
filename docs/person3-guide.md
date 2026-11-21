@@ -1,6 +1,32 @@
-# Person 3 guide — monitoring, load tests (Week 1–3)
+# Person 3 guide — monitoring, load tests, baselines, AI (Week 1–9)
 
 What exists, how to run it, and how it connects to everyone else's work.
+
+## The whole flow, in order
+
+```bash
+# once: Python tools on your machine (the AI and the result scripts run outside Docker)
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt
+
+make up          # 1. start fake apps, stub gateway, Prometheus, Grafana (http://localhost:3000)
+make results     # 2. ~25 min: Week 5 baseline + AI training/scoring + all result files
+make ai-watch    # 3. optional, live: the AI watches while you run any scenario in another tab
+make down
+```
+
+`make results` runs `experiments/run_all.sh`, which does these steps in order, so nothing has
+to be remembered or run by hand:
+
+| Step | What runs | What it leaves behind |
+|---|---|---|
+| Week 5, Mode A | gateway health checks **off**; normal, spike, failure | `raw/modeA-*_stats.csv` |
+| Week 5, Mode B | gateway health checks **on**; the same 3 scenarios | `raw/modeB-*_stats.csv`, `raw/modeB-*_metrics.csv` |
+| Week 8 train | AI learns "normal" from the Mode B normal run | `ai/models/detector.pkl` |
+| Week 8 score | sick run (app-3 fails 30% quietly), then score spike, failure, sick | `raw/*_eval.json` |
+| Week 7 save | comparison table, AI report, MTTR CSV | `mode-baseline.md`, `ai-report.html`, `raw/mttr.csv` |
+
+Quick rehearsal (~8 min): `SCENARIO_SCALE=0.3 make results`. No Docker? `NATIVE=1 make results`
+(needs a `prometheus` binary; see the top of `experiments/run_all.sh`).
 
 ## What was built
 
@@ -13,6 +39,10 @@ What exists, how to run it, and how it connects to everyone else's work.
 | Week 3: gateway graphs | `monitoring/grafana/build_dashboard.py` | ✅ 10 gateway panels |
 | (extra) stub gateway | `fakes/stub_gateway.py` | ✅ test double until Person 2's gateway is ready |
 | (extra) incident log | `fakes/events.py` → `events.jsonl` | ✅ ready for the Week 4 MTTR calculator |
+| Week 4: MTTR calculator | `experiments/mttr.py` | ✅ `make mttr` |
+| Week 5: Mode A vs Mode B baseline | `experiments/compare_modes.py`, `HEALTH_CHECKS` switch | ✅ `make results`, `make compare` |
+| Week 7: dashboard finished, results saved | AI row in Grafana, `experiments/run_all.sh` | ✅ |
+| Week 8–9: AI early warning | `ai/` | ✅ `make ai-normal`, `make ai-eval`, `make ai-watch` |
 
 ## Run it (needs Docker Desktop)
 
@@ -114,10 +144,28 @@ Rules it follows: events before a kill are ignored (startup noise), other server
 broken lines are skipped and reported, a server killed again before recovering leaves the first
 incident as NOT RECOVERED (excluded from the mean, shown in the count).
 
-## Still to do for Person 3 (Week 5–7)
+## Week 5: Mode A (no protection) vs Mode B (rules)
 
-- Mode A (no protection) vs Mode B (rules) baseline runs with the same 3 scenarios
-- Use `mttr.py --json` to put MTTR next to Locust's error rate and p99 per mode
+Same three scenarios twice. The only change is the gateway's health checks:
+
+- **Mode A** (`HEALTH_CHECKS=off`): the gateway never checks `/ready`, so a dead server keeps
+  getting a third of the traffic until it comes back by itself.
+- **Mode B** (`HEALTH_CHECKS=on`, the normal setting): 3 failed checks in a row take a server
+  out of rotation; a good `/ready` puts it back.
+
+`make results` runs both and writes `experiments/results/mode-baseline.md`. To rebuild the
+table from runs you already have: `make compare`. Decision and numbers: D-012.
+
+When Person 1's controller and Person 2's real gateway (AIMD, circuit breaker) land, run the
+same command again: Mode B then means *their* rules, and the table shows what they add.
+
+## Week 7: dashboard finished, results saved
+
+- Grafana has a third row, **AI early warning**: the AI's verdict per server (OK / SICK) and
+  how far from normal each server is, with the alarm line at 3. It fills while `make ai-watch`
+  runs (`ai_anomaly_flag`, `ai_anomaly_zscore` in Contract 4).
+- Every result file is produced by one command (`make results`) and listed in
+  `experiments/README.md`.
 
 ## Week 8–9: AI early warning
 
@@ -125,7 +173,8 @@ The new scenario `make sick` makes app-3 fail 30% of requests while `/ready` sti
 The gateway keeps sending it traffic, so users see errors and the health check never notices.
 
 1. `make ai-normal`: learn "normal" from a clean run.
-2. `make ai-eval`: run the sick scenario, score both detectors, open `experiments/results/ai-report.html`.
+2. `make ai-eval`: run the sick scenario, score both detectors, open `experiments/results/raw/ai-report-sick.html`.
+   (`make results` does steps 1–2 for you and builds the full report with all three runs.)
 3. `make ai-watch`: the live version for Person 1's controller to read (`anomaly_detected` in `events.jsonl`).
 
 Details and results: `ai/README.md`. Decision: D-011.

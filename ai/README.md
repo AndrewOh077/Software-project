@@ -16,18 +16,19 @@ server looks sick. The AI only reports; it never acts (actions are Contract 5c, 
 
 ```bash
 make ai-normal   # 3 min normal traffic -> learn "normal" -> ai/models/detector.pkl
-make ai-eval     # 3 min with app-3 secretly failing 30% -> scores + experiments/results/ai-report.html
+make ai-eval     # 3 min with app-3 secretly failing 30% -> scores + experiments/results/raw/ai-report-sick.html
 make ai-watch    # live: prints and logs anomaly_detected while you run any scenario
 ```
 
-## Results (fake stack, 2026-11-20)
+## Results (fake stack, 2026-11-20, from `make results`)
 
-| Run | Detector (2 in a row) | False alarms | Caught | AI noticed | Health check noticed |
-|---|---|---|---|---|---|
-| Traffic spike, no fault | z-score | 0 | – | – | – |
-| Traffic spike, no fault | Isolation Forest | 1 | – | – | – |
-| app-2 killed | both | 0 | 0/1 | never | 0.1 s |
-| app-3 fails 30%, says "ready" | both | 0 | 1/1 | 14 s | never |
+| Run | Detector (2 in a row) | False alarms | AI noticed | Health check noticed |
+|---|---|---|---|---|
+| Traffic spike, no fault | z-score / Isolation Forest | 0 / 0 | – | – |
+| app-2 killed | both | 0 | 10 s | 0.6 s |
+| app-3 fails 30%, says "ready" | both | 0 | 15 s | never |
 
-Full table and chart: `experiments/results/2026-11-20-ai-early-warning.html`.
+Both detectors only flag *worse* than normal (more errors, slower); faster is never an alarm
+(found in a real run, see D-011 update).
+Full table and charts: `experiments/results/ai-report.html` (made by `make results`).
 Why these choices: `docs/decisions.md` D-011.

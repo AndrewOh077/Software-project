@@ -74,6 +74,8 @@ Every service exposes the same metric **names**, so Grafana panels and the AI re
 | `gateway_rate_limit_current` | gauge | – | gateway |
 | `controller_restarts_total` | counter | `server_id` | controller |
 | `controller_emergency_mode` | gauge (0/1) | – | controller |
+| `ai_anomaly_flag` | gauge (0/1) | `server_id` | ai (`make ai-watch`, port 8010) |
+| `ai_anomaly_zscore` | gauge | `server_id`, `feature` (`err_ratio`, `p95_ms`) | ai |
 
 Useful PromQL (for Grafana):
 
@@ -180,3 +182,4 @@ One JSON object per line in `experiments/results/raw/events.jsonl` — Person 3'
 |---|---|---|
 | | Initial draft | |
 | 2026-11-20 | Add `errors_injected` chaos event (`detail.error_rate`, `detail.duration_sec`); `latency_injected` also carries `detail.duration_sec` so the AI evaluation knows when a fault ends | proposed by Person 3 |
+| 2026-11-20 | Add `ai_anomaly_flag` and `ai_anomaly_zscore` metrics so Grafana shows what the AI thinks; gateway reads `HEALTH_CHECKS=off` for the Week 5 Mode A baseline (stub only) | proposed by Person 3 |

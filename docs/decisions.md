@@ -68,3 +68,13 @@ Format:
 **Chose:** Two numbers per server every 5 s (5xx share, p95 latency). Both detectors learn "normal" from one normal-scenario run only. Default live detector: z-score, alert after 2 bad samples in a row.
 **Instead of:** Request rate (a traffic spike is not a sick server), or Isolation Forest as the default.
 **Why:** On real fake-stack runs both detectors caught the hidden 30%-error fault in 14 s with 0 false alarms, but Isolation Forest still raised 1 false alarm during the spike. With only two features the forest adds nothing; revisit when we add more features. Kills stay the health check's job (0.1 s).
+
+**Update 2026-11-20:** the second full run found one more false alarm: at the very end of a spike
+run, app-2 answered a handful of requests *faster* than normal (p95 24 ms vs 45 ms, z = −4) and
+both detectors flagged it. Both are now one-sided: only more errors or slower counts. Re-scored on
+the same saved data: 0 false alarms in all runs, sick server caught in 15 s, health check never.
+
+## D-012 — Week 5 baseline: Mode B = health checks only, rate limit off in both  (2026-11-20, Person 3)
+**Chose:** Mode A = stub gateway with `HEALTH_CHECKS=off`; Mode B = health checks on. Rate limiting off in both modes. Same three scenarios, full length, one command (`make results`).
+**Instead of:** Turning the rate limiter on in Mode B.
+**Why:** The fake app servers have no capacity limit, so a rate limit could only reject requests the servers would have handled; it would make Mode B look worse for a reason that isn't real. Result (fake stack): the failure scenario is where the modes differ: failed 11.2% → 0.2%, critical requests OK 90.2% → 99.7%. Normal and spike: 0% failed in both. MTTR in Mode B is 63.8 s because the scenario keeps app-2 dead for 60 s on purpose; a faster restart by Person 1's controller is what shrinks it. Re-run when the real gateway (AIMD, circuit breaker) and controller land.

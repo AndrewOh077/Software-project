@@ -4,7 +4,7 @@ Health checks only ask "are you alive?". A server can say "yes" and still fail 3
 requests. This module watches the numbers instead and shouts when they look abnormal.
 
 Two detectors, both trained only on a NORMAL run (no faults injected):
-  z-score           how many standard deviations a number is from normal; |z| > 3 = weird
+  z-score           how many standard deviations a number is above normal; z > 3 = weird
   Isolation Forest  many random trees cut the data; weird points get cut off in few cuts
 
 Features, one row per server every 5 s (pulled from Prometheus, Contract 4 metrics):
@@ -33,6 +33,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
+from prometheus_client import Gauge, start_http_server
 from sklearn.ensemble import IsolationForest
 
 from experiments.mttr import find_incidents, load_events, parse_ts
@@ -139,14 +140,17 @@ class Detector:
         return (_matrix(rows) - self.mean) / self.std
 
     def zscore_flags(self, rows: list[dict]) -> list[bool]:
-        return list(np.abs(self.zscores(rows)).max(axis=1) > Z_LIMIT)
+        # One-sided: only MORE errors or SLOWER counts. A server that is faster than normal
+        # (e.g. a few quick requests as a test winds down) is not sick.
+        return list(self.zscores(rows).max(axis=1) > Z_LIMIT)
 
     def forest_scores(self, rows: list[dict]) -> np.ndarray:
         # The forest sees z-scores, not raw numbers, so both features are on one scale.
         return self.forest.score_samples(self.zscores(rows))
 
     def forest_flags(self, rows: list[dict]) -> list[bool]:
-        return list(self.forest_scores(rows) < self.cutoff)
+        worse = self.zscores(rows).max(axis=1) > 0  # same rule: unusual AND worse than normal
+        return list((self.forest_scores(rows) < self.cutoff) & worse)
 
 
 def train(rows: list[dict], seed: int = 0) -> Detector:
@@ -304,16 +308,35 @@ def print_scores(scores: list[Score]) -> None:
 # ---------------------------------------------------------------- 4. live early warning
 
 
-def watch(prom: str, det: Detector, method: str, k: int) -> None:
-    """Every 5 s: score the newest row per server; log anomaly_detected when one turns sick."""
+def watch(prom: str, det: Detector, method: str, k: int, metrics_port: int = 8010) -> None:
+    """Every 5 s: score the newest row per server; log anomaly_detected when one turns sick.
+
+    Also serves /metrics on `metrics_port` so Prometheus + Grafana can show what the AI thinks.
+    """
+    flag = Gauge("ai_anomaly_flag", "1 = the AI says this server looks sick", ["server_id"])
+    zscore = Gauge(
+        "ai_anomaly_zscore", "How far above normal (z > 3 = odd)", ["server_id", "feature"]
+    )
+    if metrics_port:
+        start_http_server(metrics_port)
     run: dict[str, int] = {}
     print(f"[ai] watching {prom} with {method}, alert after {k} bad samples. Ctrl+C to stop.")
+    if metrics_port:
+        print(f"[ai] my numbers for Prometheus: http://localhost:{metrics_port}/metrics")
     while True:
         now = time.time()
-        latest = {r["server_id"]: r for r in fetch(prom, now - STEP_SEC, now)}
+        try:
+            latest = {r["server_id"]: r for r in fetch(prom, now - STEP_SEC, now)}
+        except (OSError, RuntimeError) as e:  # Prometheus not up yet / restarting: keep waiting
+            print(f"[ai] can't read {prom} yet ({e}); trying again in {STEP_SEC} s")
+            time.sleep(STEP_SEC)
+            continue
         for sid, r in latest.items():
             bad = (det.zscore_flags if method == "z-score" else det.forest_flags)([r])[0]
             run[sid] = run.get(sid, 0) + 1 if bad else 0
+            flag.labels(sid).set(int(run[sid] >= k))
+            for feat, z in zip(FEATURES, det.zscores([r])[0], strict=True):
+                zscore.labels(sid, feat).set(round(float(z), 2))
             if run[sid] == k:  # == not >=: one event per sick spell, not one every 5 s
                 z = det.zscores([r])[0]
                 write_event(
@@ -356,6 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     w.add_argument("--method", choices=["z-score", "isolation-forest"], default="z-score")
     w.add_argument("--k", type=int, default=2)
+    w.add_argument("--metrics-port", type=int, default=8010, help="0 = don't serve /metrics")
 
     a = p.parse_args(argv)
 
@@ -416,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        watch(a.prom, det, a.method, a.k)
+        watch(a.prom, det, a.method, a.k, a.metrics_port)
     except KeyboardInterrupt:
         pass
     return 0

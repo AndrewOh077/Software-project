@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 CSS = Path(__file__).with_name("report.css")
-RUN_NAMES = {"spike": "Traffic spike", "failure": "app-2 killed", "sick": "app-3 sick"}
+RUN_NAMES = {"spike": "Traffic spike", "normal": "Normal traffic"}  # runs with no fault
 W, H, PAD_L, PAD_B, PAD_T, PAD_R = 960, 220, 64, 28, 16, 8
 DETECTORS = {"z_flag": "z-score", "forest_flag": "Isolation Forest"}
 FAULT_WORDS = {
@@ -25,6 +25,15 @@ FAULT_WORDS = {
     "errors": "failed requests on purpose",
     "latency": "was slowed down",
 }
+
+
+def run_name(run_id: str, run: dict) -> str:
+    """Tab label from what really happened in the run, e.g. "app-3 sick", "app-2 killed"."""
+    f = main_fault(run)
+    if f is None:
+        return RUN_NAMES.get(run_id, run_id)
+    word = {"killed": "killed", "errors": "sick", "latency": "slow"}[f["kind"]]
+    return f"{f['server_id']} {word}"
 
 
 def esc(x) -> str:
@@ -146,7 +155,7 @@ def summary(run: dict) -> str:
 
 
 def panel(run_id: str, run: dict) -> str:
-    name = esc(RUN_NAMES.get(run_id, run_id))
+    name = esc(run_name(run_id, run))
     fault = main_fault(run)
     t0 = run["timeline"][0]["ts"]
     points = [
@@ -204,7 +213,7 @@ def board(runs: dict[str, dict]) -> str:
             pick = ' class="pick"' if (s["method"], s["k"]) == ("z-score", 2) else ""
             no_fault = '<td class="num none">no fault</td>'
             body.append(
-                f"<tr{pick}><td>{esc(RUN_NAMES.get(name, name))}</td><td>{esc(s['method'])}</td>"
+                f"<tr{pick}><td>{esc(run_name(name, run))}</td><td>{esc(s['method'])}</td>"
                 f"<td class='num'>{s['k']}</td>"
                 f"<td class='num fig'>{s['false_alarms']}</td>"
                 f"<td class='num'>{s['fp_rate']:.1%}</td>"
@@ -230,7 +239,7 @@ def steps(model: dict) -> str:
 {mean["err_ratio"]:.0%} errors (wiggle {std["err_ratio"]:.0%}) and p95
 {mean["p95_ms"]:.0f} ms (wiggle {std["p95_ms"]:.0f} ms).</p></li>
 <li><span class="n">2</span><h3>Score every {model["step_sec"]} s</h3><p>For each server: how
-many wiggles from normal is it now? More than {model["z_limit"]:.0f} counts as odd.</p></li>
+many wiggles worse than normal is it now? More than {model["z_limit"]:.0f} counts as odd.</p></li>
 <li><span class="n">3</span><h3>Two in a row</h3><p>Only two odd samples in a row raise an
 alert, so one random blip never does.</p></li>
 </ol>
@@ -336,7 +345,7 @@ def render(runs: dict[str, dict]) -> str:
     tablist = "".join(
         f'<button type="button" role="tab" class="tab" id="tab-{k}" aria-controls="panel-{k}" '
         f'aria-selected="{str(k == first).lower()}"{" data-default" if k == first else ""}>'
-        f"{esc(RUN_NAMES.get(k, k))}</button>"
+        f"{esc(run_name(k, runs[k]))}</button>"
         for k in order
     )
     panels = "".join(panel(k, runs[k]) for k in order)
@@ -359,6 +368,18 @@ def render(runs: dict[str, dict]) -> str:
         )
         for k in (1, 2)
     }
+    if z_alarms[1] > z_alarms[2]:
+        alarm_finding = (
+            "<div><h3>Two in a row stops false alarms</h3><p>Z-score false alarms across all "
+            f"runs: {z_alarms[1]} when one odd sample is enough, {z_alarms[2]} when it needs two "
+            "in a row. The cost is one more sample: 5 s slower.</p></div>"
+        )
+    else:
+        alarm_finding = (
+            "<div><h3>No false alarms</h3><p>Z-score false alarms across all runs: "
+            f"{z_alarms[2]}, even when one odd sample is enough. Two in a row stays the default "
+            "as a safety margin; it costs 5 s.</p></div>"
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -397,9 +418,7 @@ def render(runs: dict[str, dict]) -> str:
 <section class="findings" aria-label="What we learned">
 <div><h3>A crash is the health check’s job</h3><p>A killed server is caught in {kill_hc}
 and gets no traffic after that, so the AI has nothing to judge. That is fine.</p></div>
-<div><h3>Two in a row stops false alarms</h3><p>Z-score false alarms across all runs:
-{z_alarms[1]} when one odd sample is enough, {z_alarms[2]} when it needs two in a row.
-The cost is one more sample: 5 s slower.</p></div>
+{alarm_finding}
 <div><h3>The forest adds nothing yet</h3><p>With only two numbers per server, Isolation
 Forest finds the same faults as a z-score. It should help once we add more numbers.</p></div>
 </section>

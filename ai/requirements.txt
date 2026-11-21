@@ -1,3 +1,4 @@
 # Week 8–9 anomaly detection (z-score uses numpy, Isolation Forest uses scikit-learn)
 scikit-learn==1.9.1
 numpy>=2.0
+prometheus-client==0.21.1  # same as fakes/: serves the AI's numbers to Prometheus
