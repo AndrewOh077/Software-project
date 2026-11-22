@@ -1,0 +1,65 @@
+# Week 7: GitHub Actions — runs automatically on every push to main and every Pull Request.
+# Results: GitHub repo → "Actions" tab. A red ✗ on a PR means something broke.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:        # lets you press "Run workflow" by hand in the Actions tab
+
+jobs:
+  unit:
+    name: Unit tests (controller logic, no Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Syntax check
+        run: python -m py_compile app/main.py chaos/chaos.py mock_gateway/mock_gateway.py controller/*.py
+      - name: Unit tests
+        run: python -m unittest discover -s tests/unit -v
+
+  chaos:
+    name: Chaos scenarios (real Docker stack)
+    needs: unit                 # only runs if unit tests passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Start stack
+        run: docker compose up -d --build app1 app2 app3 gateway-mock controller
+
+      - name: Wait for controller
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS localhost:9100/healthz && exit 0
+            sleep 2
+          done
+          echo "controller never came up"; exit 1
+
+      - name: Run the 8 scenarios + early-warning tests
+        run: python -m unittest discover -s tests/e2e -v
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker compose logs --no-color > artifacts/compose.log 2>&1 || true
+          cp data/*.jsonl artifacts/ 2>/dev/null || true
+
+      - name: Upload logs (download from the run page if a test failed)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-run-logs
+          path: artifacts/
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
