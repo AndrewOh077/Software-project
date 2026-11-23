@@ -33,7 +33,11 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 PORTS = {"app1": 8001, "app2": 8002, "app3": 8003}
 LOG = Path(__file__).resolve().parent.parent / "data" / "chaos.jsonl"
 FAULT_DIR = Path(__file__).resolve().parent.parent / "data" / "faults"   # mounted into apps as /faults
