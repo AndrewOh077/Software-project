@@ -151,42 +151,41 @@ python -m unittest discover -s tests/unit -v
 | `WARN_WEIGHT` | 50 | 경고 받은 서버의 트래픽 비율 |
 | `WARN_DURATION_S` | 30 | 경고 효과가 몇 초 갈지 |
 
-## 🛡️ Gateway 핵심 기능 — Person 2 (Week 1–9)
+# Person 2 — Gateway (Week 1–10)
 
-사용자 요청의 최전선에서 트래픽을 제어하고 과부하 및 장애로부터 백엔드 서버를 보호하는 게이트웨이 계층입니다.
+Gateway는 모든 사용자 요청이 지나가는 **하나뿐인 입구**예요. 요청을 app1~3에 나눠주고,
+고장 난 서버는 건너뛰고, 과부하로부터 시스템을 지키고, Controller의 명령을 받아요.
 
-* **요청 라우팅 및 가중치 분배 (Week 1–3)**: 가용한 백엔드 서버(`app1~3`)로 요청을 분배하고, Controller가 설정한 가중치(`weight`) 및 상태(`HEALTHY`, `WARMING`, `DOWN`)에 따라 트래픽 비율을 실시간으로 조절합니다.
-* **트래픽 폭주 방어 — Rate Limiting & AIMD (Week 4–6)**:
-  * **Token Bucket / Rate Limiting**: 비정상적인 트래픽 스파이크 유입 시 초과 요청을 `429 Too Many Requests`로 차단하여 서버 다운을 방지합니다.
-  * **AIMD 동시성 제어 (Concurrency Limit)**: 서버 응답 상태에 따라 동시 처리 한도를 점진적으로 늘리거나(Additive Increase) 장애 시 급격히 줄여(Multiplicative Decrease) 가용 용량에 맞게 부하를 조절합니다.
-* **비상 모드 및 우선순위 보호 (Week 7–9)**:
-  * 모든 백엔드 서버가 다운되어 `emergency` 모드로 전환되면 일반(`normal`) 요청은 즉시 `503 Service Unavailable`로 차단하여 시스템 연쇄 붕괴를 막습니다.
-  * 비상 상황에서도 핵심(`critical`) 우선순위 요청은 보호하여 처리를 시도합니다.
+## Gateway가 하는 일
 
-### Gateway 통합 E2E 테스트 실행 방법
+| 기능 | 하는 일 | 주차 |
+|---|---|---|
+| Round robin 분배 | `/work` 요청을 app1→app2→app3 순서로 전달하고 서버의 실제 응답을 돌려줌 | 1–2 |
+| Health check | 각 서버를 검사해서 죽은 서버는 분배에서 제외 | 3 |
+| Admin API | `/admin/backends`로 상태·weight·mode 확인, Controller가 제외/복귀/비율 조절에 사용 | 3–5 |
+| 가중치 분배 | 복귀 단계(10%→25%→50%→100%)와 조기 경고 50% 처리 | 5–8 |
+| Rate limiting | Token bucket + 우선순위, 한도 초과 시 `429` | [ ] |
+| AIMD | 서버 상태에 따라 허용 요청량을 늘리고 줄임 | [ ] |
+| Circuit breaker | 계속 실패하는 서버로 보내는 걸 멈추고, 나중에 다시 시험 | [ ] |
+| 비상 모드 | 서버 전부 죽으면 `"mode": "emergency"` | 5 |
+| 에러 처리 | [예: 살아있는 서버가 없을 때 503, 타임아웃, 재시도 방식] | 10 |
 
-실제 Gateway 컨테이너를 활성화한 상태에서 전체 12개 시나리오(트래픽 폭주, 가용 용량 축소, 비상 모드 503 방어 등)를 검증합니다.
+## 실행해 보기
 
 ```powershell
-$env:REAL_GATEWAY = "1"
-python -m unittest discover -s tests/e2e -v
+docker compose up -d --build
+curl.exe http://localhost:8080/work?ms=50
+curl.exe http://localhost:8080/admin/backends
+```
 
-## 🏛️ 시스템 아키텍처 (System Architecture)
+## Gateway 설정
 
-Person 1(Controller)과 Person 2(Gateway) 및 App 서버들이 협업하여 트래픽을 제어하고 자가 치유를 수행하는 구조입니다.
+| 설정 | 기본값 | 의미 |
+|---|---|---|
+| `[RATE_LIMIT]` | [ ] | [ ] |
+| `[BUCKET_SIZE]` | [ ] | [ ] |
+| `[CB_FAIL_THRESHOLD]` | [ ] | [ ] |
 
-```mermaid
-graph TD
-    User([사용자 / 트래픽]) -->|HTTP Request| GW[Gateway :8080<br><i>Rate Limiting, AIMD, Emergency Mode</i>]
-    
-    subgraph Platform [Docker Platform Network]
-        GW -->|Round-Robin| App1[App Server 1 :8001]
-        GW -->|Round-Robin| App2[App Server 2 :8002]
-        GW -->|Round-Robin| App3[App Server 3 :8003]
-        
-        Ctrl[Controller :9100<br><i>Health Check, Auto-Restart, Quarantine</i>] -.->|Docker API| App1
-        Ctrl -.->|Docker API| App2
-        Ctrl -.->|Docker API| App3
-        
-        Ctrl ==>|Admin API| GW
-    end
+## 테스트
+
+```powershell
