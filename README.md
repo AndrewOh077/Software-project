@@ -13,7 +13,7 @@
 | `controller/` | **자동 복구 관리자**. 1초마다 서버를 검사하고 고장 나면 살림 | 4–5 |
 | `gateway/` | **실제 Gateway**. 요청 분배와 Controller 관리 명령을 처리 | 1–9 |
 | `tests/unit/` | Controller 판단 로직 테스트 17개 (Docker 필요 없음) | 4–8 |
-| `tests/e2e/` | **시나리오 8개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6 |
+| `tests/e2e/` | **시나리오 12개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6 |
 | `.github/workflows/ci.yml` | GitHub에 올리면 위 테스트를 자동으로 돌려줌 | 7 |
 | `docs/` | 설명서: Controller 원리, 시나리오 표, 팀원과의 약속(API) | – |
 | `prometheus/`, `grafana/` | 모니터링 (Person 3 담당) | – |
@@ -97,7 +97,7 @@ curl.exe -X POST localhost:9100/admin/release/app3
 python -m unittest discover -s tests/e2e -v
 ```
 
-5~8분 걸려요. 마지막에 `OK (skipped=3)`이 나오면 성공이에요.
+5~8분 걸려요. 마지막에 `OK`가 나오면 성공이에요.
 skip 3개는 Person 2의 Gateway가 있어야 하는 테스트예요. 자세한 표는 `docs/scenarios.md`.
 
 새로 생긴 장애 종류 (4번 시나리오용):
