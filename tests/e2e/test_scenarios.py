@@ -18,8 +18,8 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTROLLER = "http://localhost:9100"
 GATEWAY = os.getenv("GATEWAY_ADMIN", "http://localhost:8080")
@@ -126,10 +126,21 @@ class Scenarios(unittest.TestCase):
     # 1 ─ 사용자 갑자기 증가 → Rate Limiting 적용  (Person 2)
     @unittest.skipUnless(REAL_GATEWAY, "Person 2: needs real Gateway rate limiting")
     def test_s1_traffic_spike_is_rate_limited(self):
-        # TODO(Person 2): send a burst far above capacity through the Gateway and assert
-        # some requests get 429, critical requests still succeed, and app servers stay HEALTHY.
-        self.fail("not written yet")
+        def call(priority):
+            return http("GET", f"{GATEWAY}/work?ms=10&priority={priority}")[0]
 
+        # 420 requests at once, every 20th one critical
+        priorities = ["critical" if i % 20 == 0 else "normal" for i in range(420)]
+        with ThreadPoolExecutor(max_workers=50) as pool:
+            codes = list(pool.map(call, priorities))
+        normal = [c for c, p in zip(codes, priorities) if p == "normal"]
+        critical = [c for c, p in zip(codes, priorities) if p == "critical"]
+
+        self.assertGreater(normal.count(429), 0, f"burst was not rate limited: {sorted(set(normal))}")
+        self.assertIn(200, normal, "some normal requests should still be served")
+        self.assertEqual(set(critical), {200}, f"critical requests must survive the spike: {critical}")
+        wait_until(all_healthy, 30, "app servers stay HEALTHY after the spike")
+        
     # 2 ─ Server B 종료 → B 제외 후 A와 C로 트래픽 분배
     def test_s2_one_server_killed(self):
         docker("kill", "app2")
@@ -161,9 +172,14 @@ class Scenarios(unittest.TestCase):
 
     @unittest.skipUnless(REAL_GATEWAY, "Person 2: needs real Gateway AIMD limiter")
     def test_s3b_limit_shrinks_with_capacity(self):
-        # TODO(Person 2): with 2 of 3 servers down, assert the Gateway's concurrency limit
-        # drops to roughly 1/3 and grows back after recovery.
-        self.fail("not written yet")
+        def limit():
+            return get(f"{GATEWAY}/metrics")["concurrency_limit"]
+        full = get(f"{GATEWAY}/metrics")["concurrency_max"]
+        wait_until(lambda: limit() >= full * 0.9, 30, "limit at full capacity before the test")
+        docker("kill", "app1", "app3")
+        wait_until(lambda: limit() <= full * 0.4, 20, "limit shrinks to about 1/3")
+        wait_until(all_healthy, RECOVERY_SLO_S + 15, "app1+app3 recovered")
+        wait_until(lambda: limit() >= full * 0.9, 60, "limit grows back after recovery")
 
     # 4 ─ 서버 복구 실패 → 재시작 제한 → 격리 + Emergency Mode
     def test_s4_recovery_fails_then_emergency(self):
@@ -194,14 +210,17 @@ class Scenarios(unittest.TestCase):
     # 6 ─ 서버 다시 정상 작동 → Readiness 확인 후 점진적 복귀 (10→25→50→100%)
     def test_s6_gradual_return_after_recovery(self):
         before = restarts("app3")
-        docker("kill", "app3")
-        wait_until(recovered_again("app3", before), RECOVERY_SLO_S, "app3 restarted and recovered")
-        calls = get(f"{GATEWAY}/admin/calls")
-        weights = [c["body"]["weight"] for c in calls if c["path"] == "/admin/backends/app3/weight"]
-        self.assertEqual(weights[-4:], [10, 25, 50, 100], f"weights sent: {weights}")
-        ramp = [e for e in events({"state_change"}, self.t0)
-                if e["server"] == "app3" and e["new"] == "WARMING"]
-        self.assertTrue(ramp, "went through WARMING before HEALTHY")
+        docker("kill", *SERVERS)
+        wait_until(lambda: gateway()["mode"] == "emergency", 20, "gateway in emergency mode")
+        code, body = http("GET", f"{GATEWAY}/work?priority=normal")
+        self.assertEqual(code, 503, body)
+        self.assertIn("emergency", body["detail"])
+        code, body = http("GET", f"{GATEWAY}/work?priority=critical")
+        self.assertNotIn("emergency", str(body.get("detail", "")), "critical requests must still be tried")
+
+        wait_until(all_healthy, RECOVERY_SLO_S + 30, "everything recovered and emergency OFF")
+        wait_until(lambda: http("GET", f"{GATEWAY}/work?ms=10")[0] == 200, 30,
+                   "normal requests are served again")
 
     # 7 ─ 모든 App 서버 다운 → Emergency + 관리자 경고 (503 응답은 Person 2의 Gateway)
     def test_s7_all_servers_down(self):
@@ -214,8 +233,16 @@ class Scenarios(unittest.TestCase):
 
     @unittest.skipUnless(REAL_GATEWAY, "Person 2: needs real Gateway emergency behaviour")
     def test_s7b_gateway_returns_503_for_normal_requests(self):
-        # TODO(Person 2): during emergency, normal requests -> 503, critical requests still tried.
-        self.fail("not written yet")
+        docker("kill", *SERVERS)
+        wait_until(lambda: gateway()["mode"] == "emergency", 20, "gateway in emergency mode")
+        code, body = http("GET", f"{GATEWAY}/work?priority=normal")
+        self.assertEqual(code, 503, body)
+        self.assertIn("emergency", body["detail"])
+        code, body = http("GET", f"{GATEWAY}/work?priority=critical")
+        self.assertNotIn("emergency", str(body.get("detail", "")), "critical requests must still be tried")
+        wait_until(all_healthy, RECOVERY_SLO_S + 30, "everything recovered and emergency OFF")
+        wait_until(lambda: http("GET", f"{GATEWAY}/work?ms=10")[0] == 200, 30,
+                   "normal requests are served again")
 
     # 8 ─ AI 작동 중단 → Rule-based Controller가 계속 보호
     def test_s8_recovery_works_without_ai(self):

@@ -150,3 +150,103 @@ python -m unittest discover -s tests/unit -v
 | `READY_TIMEOUT_S` | 15 | 재시작 후 몇 초 안에 살아나야 하는지 |
 | `WARN_WEIGHT` | 50 | 경고 받은 서버의 트래픽 비율 |
 | `WARN_DURATION_S` | 30 | 경고 효과가 몇 초 갈지 |
+
+# Person 2 — Gateway (Week 1–10)
+
+Gateway는 모든 사용자 요청이 지나가는 **하나뿐인 입구**예요 (`gateway/gateway.py`, FastAPI).
+요청을 app1~3에 나눠주고, 과부하로부터 시스템을 지키고, Controller의 명령대로 서버를 빼거나 되돌려요.
+
+> 중요한 설계: Gateway는 **스스로 서버를 제외하지 않아요.** 서버가 고장 났는지 판단하는 건 Controller이고,
+> Gateway는 Controller가 보내는 `disable / enable / weight / mode` 명령만 따라요.
+
+## Gateway가 하는 일
+
+| 기능 | 하는 일 |
+|---|---|
+| 가중치 Round robin | `/work` 요청을 켜져 있는(enabled) 서버에 weight 비율대로 돌아가며 전달하고, 서버의 실제 응답을 그대로 돌려줌 |
+| Failover | 서버에 연결이 안 되거나 타임아웃이면 다른 서버로 한 번씩 더 시도. 다 실패하면 `503` |
+| Admin API | Controller가 서버를 제외/복귀/비율 조절하고 모드를 바꾸는 창구 |
+| Rate limiting | Token bucket + 우선순위(`critical`/`normal`/`low`). 한도 초과 시 `429` + `Retry-After: 1` |
+| AIMD 동시 처리 제한 | 동시에 처리하는 요청 수의 상한을 서버 용량에 맞춰 자동 조절. 한도 초과 시 `429` |
+| 비상 모드 | `mode`가 `emergency`이면 `critical` 요청만 받고 나머지는 `503` |
+| 에러 처리 | 아래 표 참고 |
+
+### 요청 우선순위
+
+`/work?priority=critical`, `/work?priority=normal`(기본), `/work?priority=low`
+
+- **critical**: Rate limit과 동시 처리 제한을 건너뛰고 비상 모드에서도 통과해요.
+- **normal**: 토큰이 있으면 통과해요.
+- **low**: 토큰이 버킷 용량의 50% 아래로 내려가면 먼저 거절돼요 (`LOW_PRIORITY_RESERVE`).
+
+### AIMD가 동작하는 방식
+
+- 상한 = `CONCURRENCY_PER_BACKEND` × (켜져 있는 서버들의 weight 합 ÷ 100). 서버가 빠지면 상한이 **즉시** 줄어요.
+- 서버가 돌아오면 초당 `AIMD_INCREASE_PER_S`씩 **천천히** 늘어나요 (Additive Increase).
+- 응답이 5xx이거나 서버에 못 닿으면 현재 한도에 `AIMD_DECREASE_FACTOR`를 곱해서 **확 줄여요** (Multiplicative Decrease).
+
+### 에러 처리
+
+| 상황 | 응답 |
+|---|---|
+| 한도 초과 (Token bucket) | `429` `rate limit exceeded` |
+| 동시 처리 한도 초과 (AIMD) | `429` `concurrency limit reached` |
+| 비상 모드에서 `critical`이 아닌 요청 | `503` `emergency mode accepts critical requests only` |
+| 켜진 서버가 하나도 없거나 전부 연결 실패 | `503` `no reachable enabled backend` |
+| 없는 서버 이름으로 admin 명령 | `404` |
+| weight가 0–100 정수가 아님 | `400` |
+| 서버가 5xx로 응답 | 그 응답을 그대로 전달 (다른 서버로 재시도하지 않음) |
+
+## 엔드포인트
+
+| 주소 | 설명 |
+|---|---|
+| `GET /work` | 사용자 요청. `?priority=`와 나머지 쿼리는 서버로 그대로 전달 |
+| `GET /route` | 다음에 선택될 서버 이름과 주소 확인 (디버깅용) |
+| `GET /health` | Gateway 자신이 살아 있는지 |
+| `GET /admin/backends` | 서버별 `enabled`/`weight`와 현재 `mode` |
+| `POST /admin/backends/{name}/disable` | 서버를 분배에서 제외 |
+| `POST /admin/backends/{name}/enable` | 서버를 다시 포함 |
+| `POST /admin/backends/{name}/weight` | 트래픽 비율 설정 (`{"weight": 0~100}`) |
+| `POST /admin/mode` | `{"mode": "normal"}` 또는 `{"mode": "emergency"}` |
+| `GET /admin/calls` | Controller가 보낸 최근 명령 200개 기록 |
+| `GET /metrics` | 현재 mode, 켜진 서버 수, 동시 처리 한도/상한/진행 중 요청 수 |
+
+## 실행해 보기
+
+```powershell
+docker compose up -d --build
+curl.exe "http://localhost:8080/work?ms=50"
+curl.exe "http://localhost:8080/work?ms=50&priority=critical"
+curl.exe http://localhost:8080/admin/backends
+curl.exe http://localhost:8080/metrics
+```
+
+Controller 없이 직접 명령해 보기:
+
+```powershell
+curl.exe -X POST http://localhost:8080/admin/backends/app2/disable
+curl.exe -X POST http://localhost:8080/admin/backends/app2/weight -H "Content-Type: application/json" -d '{\"weight\": 50}'
+curl.exe -X POST http://localhost:8080/admin/backends/app2/enable
+```
+
+## Gateway 설정
+
+`docker-compose.yml`의 `gateway` 서비스에 `environment:`로 추가하면 돼요.
+
+| 설정 | 기본값 | 의미 |
+|---|---|---|
+| `REQUEST_TIMEOUT` | 3 | 서버 응답을 몇 초까지 기다릴지 |
+| `APP1_URL`, `APP2_URL`, `APP3_URL` | `http://appN:8000` | 각 서버 주소 |
+| `RATE_LIMIT_RPS` | 50 | 초당 허용 요청 수 (토큰이 차오르는 속도) |
+| `RATE_LIMIT_BURST` | 100 | 한꺼번에 받을 수 있는 최대 요청 수 (버킷 크기) |
+| `LOW_PRIORITY_RESERVE` | 0.5 | `low` 요청은 토큰이 버킷의 이 비율 아래면 거절 |
+| `CONCURRENCY_PER_BACKEND` | 30 | 서버 1대당 동시에 처리할 요청 수 |
+| `AIMD_INCREASE_PER_S` | 5 | 한도가 초당 얼마씩 회복되는지 |
+| `AIMD_DECREASE_FACTOR` | 0.5 | 실패 시 한도에 곱하는 값 |
+
+## 테스트
+
+```powershell
+python -m unittest discover -s tests/e2e -v
+```

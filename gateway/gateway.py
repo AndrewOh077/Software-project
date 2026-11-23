@@ -20,7 +20,77 @@ BACKENDS = {
     "app2": os.getenv("APP2_URL", "http://app2:8000"),
     "app3": os.getenv("APP3_URL", "http://app3:8000"),
 }
+RATE_LIMIT_RPS = float(os.getenv("RATE_LIMIT_RPS", "50"))
+RATE_LIMIT_BURST = float(os.getenv("RATE_LIMIT_BURST", "100"))
+LOW_PRIORITY_RESERVE = float(os.getenv("LOW_PRIORITY_RESERVE", "0.5"))
+CONCURRENCY_PER_BACKEND = float(os.getenv("CONCURRENCY_PER_BACKEND", "30"))
+AIMD_INCREASE_PER_S = float(os.getenv("AIMD_INCREASE_PER_S", "5"))
+AIMD_DECREASE_FACTOR = float(os.getenv("AIMD_DECREASE_FACTOR", "0.5"))
 
+
+class TokenBucket:
+    """Rate limit. critical requests are never limited; low is shed first."""
+
+    def __init__(self, rate: float, capacity: float) -> None:
+        self.rate = rate
+        self.capacity = capacity
+        self.tokens = capacity
+        self.updated: float | None = None
+
+    def allow(self, priority: str = "normal", now: float | None = None) -> bool:
+        if priority == "critical":
+            return True
+        now = time.monotonic() if now is None else now
+        if self.updated is not None:
+            self.tokens = min(self.capacity, self.tokens + max(0.0, now - self.updated) * self.rate)
+        self.updated = now
+        reserve = LOW_PRIORITY_RESERVE * self.capacity if priority == "low" else 0.0
+        if self.tokens - 1 >= reserve:
+            self.tokens -= 1
+            return True
+        return False
+
+
+class AimdLimiter:
+    """Concurrency limit. Shrinks at once when capacity drops, grows back additively,
+    and is cut by a factor when a backend fails (additive increase, multiplicative decrease)."""
+
+    def __init__(self, per_backend: float, increase_per_s: float, decrease_factor: float, minimum: float = 1.0) -> None:
+        self.per_backend = per_backend
+        self.increase_per_s = increase_per_s
+        self.decrease_factor = decrease_factor
+        self.minimum = minimum
+        self.maximum = per_backend * len(BACKENDS)
+        self.limit = self.maximum
+        self.inflight = 0
+        self.updated: float | None = None
+
+    def ceiling(self, backends: dict) -> float:
+        capacity = sum(item["weight"] / 100 for item in backends.values() if item["enabled"])
+        return max(self.minimum, self.per_backend * capacity)
+
+    def refresh(self, backends: dict, now: float | None = None) -> float:
+        now = time.monotonic() if now is None else now
+        elapsed = 0.0 if self.updated is None else max(0.0, now - self.updated)
+        self.updated = now
+        ceiling = self.ceiling(backends)
+        if self.limit > ceiling:
+            self.limit = ceiling
+        else:
+            self.limit = min(ceiling, self.limit + self.increase_per_s * elapsed)
+        return self.limit
+
+    def try_acquire(self, backends: dict, now: float | None = None) -> bool:
+        self.refresh(backends, now)
+        if self.inflight >= int(self.limit):
+            return False
+        self.inflight += 1
+        return True
+
+    def release(self, failed: bool = False) -> None:
+        self.inflight = max(0, self.inflight - 1)
+        if failed:
+            self.limit = max(self.minimum, self.limit * self.decrease_factor)
 
 class WeightUpdate(BaseModel):
     weight: int
@@ -86,6 +156,8 @@ class GatewayState:
 
 
 state = GatewayState()
+bucket = TokenBucket(RATE_LIMIT_RPS, RATE_LIMIT_BURST)
+limiter = AimdLimiter(CONCURRENCY_PER_BACKEND, AIMD_INCREASE_PER_S, AIMD_DECREASE_FACTOR)
 app = FastAPI(title="ResiliGuard Gateway", description="Controller-compatible traffic gateway", version="1.0.0")
 
 
@@ -107,11 +179,7 @@ async def choose_route() -> dict[str, str]:
     return {"selected_backend": name, "url": BACKENDS[name]}
 
 
-@app.get("/work")
-async def forward_work(request: Request, priority: str = "normal") -> Response:
-    if state.mode == "emergency" and priority != "critical":
-        raise HTTPException(status_code=503, detail="emergency mode accepts critical requests only")
-
+async def _forward(request: Request) -> Response:
     tried: set[str] = set()
     while len(tried) < len(BACKENDS):
         name = await state.choose()
@@ -129,6 +197,28 @@ async def forward_work(request: Request, priority: str = "normal") -> Response:
             continue
     raise HTTPException(status_code=503, detail="no reachable enabled backend")
 
+
+@app.get("/work")
+async def forward_work(request: Request, priority: str = "normal") -> Response:
+    critical = priority == "critical"
+    if state.mode == "emergency" and not critical:
+        raise HTTPException(status_code=503, detail="emergency mode accepts critical requests only")
+    if not critical:
+        if not bucket.allow(priority):
+            raise HTTPException(status_code=429, detail="rate limit exceeded", headers={"Retry-After": "1"})
+        if not limiter.try_acquire(state.backends):
+            raise HTTPException(status_code=429, detail="concurrency limit reached", headers={"Retry-After": "1"})
+    failed = False
+    try:
+        response = await _forward(request)
+        failed = response.status_code >= 500
+        return response
+    except HTTPException:
+        failed = True
+        raise
+    finally:
+        if not critical:
+            limiter.release(failed)
 
 @app.get("/admin/backends")
 async def backend_status() -> dict:
@@ -162,4 +252,10 @@ async def admin_calls() -> list[dict]:
 
 @app.get("/metrics")
 async def metrics() -> JSONResponse:
-    return JSONResponse({"mode": state.mode, "enabled_backends": sum(1 for item in state.backends.values() if item["enabled"] and item["weight"] > 0)})
+    return JSONResponse({
+        "mode": state.mode,
+        "enabled_backends": sum(1 for item in state.backends.values() if item["enabled"] and item["weight"] > 0),
+        "concurrency_limit": round(limiter.refresh(state.backends), 1),
+        "concurrency_max": limiter.maximum,
+        "inflight": limiter.inflight,
+    })
