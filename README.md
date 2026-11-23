@@ -150,3 +150,43 @@ python -m unittest discover -s tests/unit -v
 | `READY_TIMEOUT_S` | 15 | 재시작 후 몇 초 안에 살아나야 하는지 |
 | `WARN_WEIGHT` | 50 | 경고 받은 서버의 트래픽 비율 |
 | `WARN_DURATION_S` | 30 | 경고 효과가 몇 초 갈지 |
+
+## 🛡️ Gateway 핵심 기능 — Person 2 (Week 1–9)
+
+사용자 요청의 최전선에서 트래픽을 제어하고 과부하 및 장애로부터 백엔드 서버를 보호하는 게이트웨이 계층입니다.
+
+* **요청 라우팅 및 가중치 분배 (Week 1–3)**: 가용한 백엔드 서버(`app1~3`)로 요청을 분배하고, Controller가 설정한 가중치(`weight`) 및 상태(`HEALTHY`, `WARMING`, `DOWN`)에 따라 트래픽 비율을 실시간으로 조절합니다.
+* **트래픽 폭주 방어 — Rate Limiting & AIMD (Week 4–6)**:
+  * **Token Bucket / Rate Limiting**: 비정상적인 트래픽 스파이크 유입 시 초과 요청을 `429 Too Many Requests`로 차단하여 서버 다운을 방지합니다.
+  * **AIMD 동시성 제어 (Concurrency Limit)**: 서버 응답 상태에 따라 동시 처리 한도를 점진적으로 늘리거나(Additive Increase) 장애 시 급격히 줄여(Multiplicative Decrease) 가용 용량에 맞게 부하를 조절합니다.
+* **비상 모드 및 우선순위 보호 (Week 7–9)**:
+  * 모든 백엔드 서버가 다운되어 `emergency` 모드로 전환되면 일반(`normal`) 요청은 즉시 `503 Service Unavailable`로 차단하여 시스템 연쇄 붕괴를 막습니다.
+  * 비상 상황에서도 핵심(`critical`) 우선순위 요청은 보호하여 처리를 시도합니다.
+
+### Gateway 통합 E2E 테스트 실행 방법
+
+실제 Gateway 컨테이너를 활성화한 상태에서 전체 12개 시나리오(트래픽 폭주, 가용 용량 축소, 비상 모드 503 방어 등)를 검증합니다.
+
+```powershell
+$env:REAL_GATEWAY = "1"
+python -m unittest discover -s tests/e2e -v
+
+## 🏛️ 시스템 아키텍처 (System Architecture)
+
+Person 1(Controller)과 Person 2(Gateway) 및 App 서버들이 협업하여 트래픽을 제어하고 자가 치유를 수행하는 구조입니다.
+
+```mermaid
+graph TD
+    User([사용자 / 트래픽]) -->|HTTP Request| GW[Gateway :8080<br><i>Rate Limiting, AIMD, Emergency Mode</i>]
+    
+    subgraph Platform [Docker Platform Network]
+        GW -->|Round-Robin| App1[App Server 1 :8001]
+        GW -->|Round-Robin| App2[App Server 2 :8002]
+        GW -->|Round-Robin| App3[App Server 3 :8003]
+        
+        Ctrl[Controller :9100<br><i>Health Check, Auto-Restart, Quarantine</i>] -.->|Docker API| App1
+        Ctrl -.->|Docker API| App2
+        Ctrl -.->|Docker API| App3
+        
+        Ctrl ==>|Admin API| GW
+    end
