@@ -1,0 +1,75 @@
+x-app: &app
+  build: ./app
+  restart: "no"   # 일부러 끔: 자동 복구는 Docker가 아니라 우리 controller가 함
+  environment: &app-env
+    READY_DELAY_S: "3"
+  volumes:
+    - ./data/faults:/faults:ro   # chaos.py break/fix 가 여기에 파일을 만들고 지움
+  networks: [platform]
+
+services:
+  app1:
+    <<: *app
+    container_name: app1
+    environment: { <<: *app-env, SERVER_ID: "app1" }
+    ports: ["8001:8000"]
+
+  app2:
+    <<: *app
+    container_name: app2
+    environment: { <<: *app-env, SERVER_ID: "app2" }
+    ports: ["8002:8000"]
+
+  app3:
+    <<: *app
+    container_name: app3
+    environment: { <<: *app-env, SERVER_ID: "app3" }
+    ports: ["8003:8000"]
+
+  # ---------------------------------------------------------------- Week 4–5: self-healing controller
+  controller:
+    build: ./controller
+    container_name: controller
+    environment:
+      SERVERS: "app1=http://app1:8000,app2=http://app2:8000,app3=http://app3:8000"
+      GATEWAY_URL: "http://gateway:8080"
+      DATA_DIR: "/data"
+      READY_TIMEOUT_S: "15"      # 재시작 후 15초 안에 안 살아나면 실패로 봄
+      # ALERT_WEBHOOK_URL: "https://discord.com/api/webhooks/..."   # 선택: 알림을 Discord로
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # 컨테이너를 재시작할 권한
+      - ./data:/data                                 # events.jsonl 저장
+    ports: ["9100:9100"]
+    depends_on: [app1, app2, app3, gateway]
+    restart: unless-stopped   # controller 자신은 Docker가 살려줌
+    networks: [platform]
+
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    ports: ["8080:8080"]
+    networks: [platform]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["9090:9090"]
+    networks: [platform]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+    networks: [platform]
+
+networks:
+  platform:
