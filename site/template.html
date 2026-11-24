@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResiliGuard: a web platform that heals itself</title>
+<meta name="description" content="A student-built platform that notices broken servers, repairs them, and warns before users notice. Replay a real failure.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@400;500;800&display=swap">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar"><div class="container">
+<a class="wordmark" href="#main">ResiliGuard</a>
+<nav aria-label="Sections"><ul>
+<li><a href="#replay">Replay</a></li><li><a href="#results">Results</a></li>
+<li><a href="#how">How</a></li><li><a href="$repo">Code</a></li>
+</ul></nav>
+</div></header>
+
+<main id="main">
+<section class="hero" aria-labelledby="h1"><div class="container">
+<div>
+<h1 id="h1">Servers break. This one heals itself.</h1>
+<p class="lead">A student-built platform that finds broken servers, repairs them, warns early.</p>
+<div class="actions"><a class="btn primary" href="#replay">Watch a real crash</a><a class="btn" href="$repo">See the code</a></div>
+</div>
+<div>
+<dl class="plates">
+<div class="plate"><dt>Requests failed during faults, no protection</dt><dd>$err_a</dd></div>
+<div class="plate ink"><dt>Same faults, rules + AI</dt><dd>$err_c</dd></div>
+</dl>
+</div>
+</div></section>
+
+<section class="replay" id="replay" aria-labelledby="replay-h"><div class="container">
+<div class="replay-head">
+<h2 id="replay-h">Replay a real failure</h2>
+<p>Pick a fault, press Play, then switch protection.</p>
+</div>
+<div class="controls">
+<fieldset><legend>Fault</legend><div class="seg" id="scenario">$scenario_inputs</div></fieldset>
+<fieldset><legend>Protection</legend><div class="seg" id="mode">$mode_inputs</div></fieldset>
+<div class="clock">
+<button class="btn primary" id="play" type="button" aria-pressed="false">Play</button>
+<label class="visually-hidden" for="time">Time in the run</label>
+<input type="range" id="time" min="0" max="200" step="1" value="55">
+<output id="clock" for="time">55 s</output>
+</div>
+</div>
+<div class="stage">
+<div class="servers" id="servers">$server_tiles</div>
+<div class="side">
+<dl class="now"><dt>Requests users did not get served, now</dt><dd id="now">0%</dd><dd class="hint">Counts errors and requests the gateway turned away on purpose (429).</dd></dl>
+<ol class="feed" id="feed" aria-live="polite" aria-label="What happened"><li><b>55 s</b><span>Press Play, or drag the time bar.</span></li></ol>
+</div>
+</div>
+<noscript><p class="replay-note">The replay needs JavaScript. The numbers below are the same runs.</p></noscript>
+<p class="replay-note">A real recording of the team’s code (fault at 60 s, undone at 120 s), 4x speed. Nothing here talks to a live server.</p>
+</div></section>
+
+<section class="results" id="results" aria-labelledby="results-h"><div class="container">
+<h2 id="results-h">Same faults, three levels of protection</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">During faults</th><th scope="col">No protection</th><th scope="col">Rules</th><th scope="col">Rules + AI</th></tr></thead>
+<tbody>$result_rows</tbody>
+</table></div>
+<p class="more"><a class="btn" href="report.html">All charts</a></p>
+</div></section>
+
+<section class="how" id="how" aria-labelledby="how-h"><div class="container">
+<div class="arch" role="img" aria-label="Users send requests to the gateway, which spreads them over three app servers. The controller checks each server every second and restarts broken ones. Prometheus collects numbers; the AI reads them and warns the controller.">
+<svg viewBox="0 0 640 410" aria-hidden="true">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0 0 10 5 0 10z"/></marker>
+<marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head ai" d="M0 0 10 5 0 10z"/></marker></defs>
+<text x="390" y="24" text-anchor="middle">sets each server’s share</text>
+<path class="line" d="M565 150V34H210v112" marker-end="url(#a)"/>
+<rect class="box" x="10" y="150" width="100" height="56"/><text x="60" y="183" text-anchor="middle">Users</text>
+<rect class="box ink" x="150" y="150" width="120" height="56"/><text class="on-ink" x="210" y="183" text-anchor="middle">Gateway</text>
+<rect class="box" x="330" y="60" width="110" height="48"/><text x="385" y="89" text-anchor="middle">app1</text>
+<rect class="box" x="330" y="152" width="110" height="48"/><text x="385" y="181" text-anchor="middle">app2</text>
+<rect class="box" x="330" y="244" width="110" height="48"/><text x="385" y="273" text-anchor="middle">app3</text>
+<rect class="box ink" x="500" y="150" width="130" height="56"/><text class="on-ink" x="565" y="183" text-anchor="middle">Controller</text>
+<rect class="box" x="330" y="320" width="110" height="40"/><text x="385" y="345" text-anchor="middle">Prometheus</text>
+<rect class="box ai" x="150" y="320" width="120" height="40"/><text x="210" y="345" text-anchor="middle">AI</text>
+<path class="line" d="M110 178h36" marker-end="url(#a)"/>
+<path class="line" d="M270 178 326 86" marker-end="url(#a)"/>
+<path class="line" d="M270 178h56" marker-end="url(#a)"/>
+<path class="line" d="M270 178l56 90" marker-end="url(#a)"/>
+<path class="line" d="M500 178 444 86" marker-end="url(#a)"/>
+<path class="line" d="M500 178h-56" marker-end="url(#a)"/>
+<path class="line" d="M500 178l-56 90" marker-end="url(#a)"/>
+<path class="line" d="M385 292v24" marker-end="url(#a)"/>
+<text x="395" y="311">every 2 s</text>
+<path class="line" d="M330 340h-56" marker-end="url(#a)"/>
+<path class="line ai" d="M210 360v25h390V210" marker-end="url(#b)"/>
+<text x="405" y="403" text-anchor="middle">AI warns the controller</text>
+</svg>
+</div>
+<div>
+<h2 id="how-h">How it heals</h2>
+<ol class="steps">
+<li><span class="n">1</span><div><h3>Notice</h3><p>The controller checks every server every second. Dead ones leave traffic.</p></div></li>
+<li><span class="n">2</span><div><h3>Repair</h3><p>It restarts them and brings traffic back slowly: 10, 25, 50, 100%.</p></div></li>
+<li><span class="n">3</span><div><h3>Warn early</h3><p>The AI spots servers that still say “fine” but fail or slow down.</p></div></li>
+</ol>
+</div>
+</div></section>
+
+<section class="team" id="team" aria-labelledby="team-h"><div class="container">
+<h2 id="team-h">Who built what</h2>
+<ul class="people">
+<li><h3>App servers and controller</h3><p>Self-healing controller, chaos tool, end-to-end tests.</p><a href="https://github.com/AndrewOh077">AndrewOh077</a></li>
+<li><h3>Gateway</h3><p>Rate limits, adaptive concurrency, emergency mode.</p><a href="https://github.com/j2346lee">j2346lee</a></li>
+<li><h3>Monitoring, load tests, AI</h3><p>Prometheus, Grafana, Locust, anomaly detection, experiments.</p><a href="https://github.com/Samuel0720-source">Samuel0720-source</a></li>
+</ul>
+</div></section>
+</main>
+
+<footer><div class="container">Numbers and replays come from real runs of the code in <a href="$repo">the repository</a>, built by <code>experiments/build_site.py</code> on $built.</div></footer>
+<script src="data.js"></script>
+<script src="replay.js"></script>
+</body>
+</html>

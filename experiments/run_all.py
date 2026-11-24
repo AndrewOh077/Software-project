@@ -15,6 +15,7 @@ What it does
        experiments/results/report.html        charts + AI results (open in a browser)
        experiments/results/postmortems/       one report per incident in Mode C (Week 10)
        experiments/results/raw/               raw numbers (git-ignored)
+       site/                                  the project website (GitHub Pages publishes it on push)
 
 Part of it: python experiments/run_all.py --modes B --scenarios errors
 """
@@ -137,7 +138,8 @@ def write_results() -> None:
     run(PY, "experiments/compare.py")
     if evals:
         run(PY, "-m", "ai.report", str(OUT / "report.html"), *evals, f"modes={RAW / 'three-mode.json'}")
-    print(f"\nDone. Open {OUT / 'report.html'} in a browser; table: {OUT / 'three-mode.md'}")
+    run(PY, "experiments/build_site.py", check=False)  # website numbers + replays (site/)
+    print(f"\nDone. Open {OUT / 'report.html'} or site/index.html; table: {OUT / 'three-mode.md'}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -147,8 +149,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--results-only", action="store_true", help="skip the runs, rebuild the results")
     a = p.parse_args(argv)
     RAW.mkdir(parents=True, exist_ok=True)
-    wait_for("http://localhost:9090/-/ready")
-    if not a.results_only:
+    if not a.results_only:  # rebuilding results only reads files: no services needed
+        wait_for("http://localhost:9090/-/ready")
         run_modes(a.modes.split(","), a.scenarios.split(","))
     write_results()
     return 0

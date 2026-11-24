@@ -11,3 +11,6 @@ experiments/results/raw/
 ai/models/*.pkl
 .pytest_cache/
 .ruff_cache/
+
+# design-check screenshots
+site/.hallmark/
