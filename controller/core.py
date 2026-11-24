@@ -33,7 +33,7 @@ from enum import Enum
 
 from .adapters import Probe
 from .config import Config
-from .events import EventLog
+from .events import EventLog, IncidentTracker
 
 
 class State(str, Enum):
@@ -79,13 +79,15 @@ class Server:
 
 class Controller:
     def __init__(self, cfg: Config, servers: dict[str, str], prober, docker, gateway,
-                 events: EventLog, alerter, clock=time.monotonic, async_restart: bool = True):
+                 events: EventLog, alerter, incidents: IncidentTracker | None = None,
+                 clock=time.monotonic, async_restart: bool = True):
         self.cfg = cfg
         self.prober = prober
         self.docker = docker
         self.gateway = gateway
         self.events = events
         self.alerter = alerter
+        self.incidents = incidents or IncidentTracker(events)
         self.clock = clock
         # True (real use): `docker restart` runs in a background thread so the controller
         # keeps answering its API and can restart several servers at once.
@@ -113,6 +115,7 @@ class Controller:
                 s.last_probe = probes[s.name]
                 self._step(s, probes[s.name], now)
             self._update_emergency(now)
+            self._update_incident()
             self.ticks += 1
 
     def _probe_all(self) -> dict:
@@ -227,6 +230,7 @@ class Controller:
         s.consecutive_fail = 0
         s.next_restart_at = now  # first restart attempt right away
         self._gw_disable(s)
+        self.incidents.open(reason=f"{s.name}: {reason}")
         self.events.emit("server_down", server=s.name, live=p.live, ready=p.ready, reason=reason)
         if self._should_restart(s, p, now):  # dead process: don't wait a tick, restart now
             self._try_restart(s, now)
@@ -331,6 +335,7 @@ class Controller:
                 self._calm_since = None
                 self.gateway.set_mode("emergency")
                 why = "server quarantined" if quarantined else f"only {serving} server(s) serving"
+                self.incidents.open(reason=f"emergency: {why}")
                 self.events.emit("emergency_on", reason=why, serving=serving)
                 self.alerter.send(f"EMERGENCY MODE ON — {why}. Gateway now serves critical requests only.")
             return
@@ -349,6 +354,13 @@ class Controller:
             self.gateway.set_mode("normal")
             self.events.emit("emergency_off", serving=serving)
             self.alerter.send(f"Emergency mode off — {serving} servers serving again.")
+
+    def _update_incident(self) -> None:
+        """Close the open incident once every server is back to normal and emergency is off."""
+        if self.incidents.current is None or self.emergency:
+            return
+        if all(s.state in (State.HEALTHY, State.SUSPECT) for s in self.servers.values()):
+            self.incidents.close()
 
     # ================================================================ early warning (Week 8)
     def warn(self, server: str, score: float | None = None, reason: str = "",
@@ -402,6 +414,9 @@ class Controller:
             return {
                 "emergency": self.emergency,
                 "uptime_s": round(now - self.started_at, 1),
+                "incident": self.incidents.current and {
+                    k: self.incidents.current[k] for k in ("id", "started", "reason", "servers")
+                },
                 "servers": {
                     s.name: {
                         "state": s.state.value,
@@ -446,6 +461,10 @@ class Controller:
             L += [
                 "# TYPE controller_serving_servers gauge", f"controller_serving_servers {serving}",
                 "# TYPE controller_emergency_mode gauge", f"controller_emergency_mode {int(self.emergency)}",
+                "# TYPE controller_incident_open gauge",
+                f"controller_incident_open {int(self.incidents.current is not None)}",
+                "# TYPE controller_incidents_total counter",
+                f"controller_incidents_total {self.incidents.total}",
                 "# TYPE controller_uptime_seconds gauge",
                 f"controller_uptime_seconds {round(now - self.started_at, 1)}",
             ]

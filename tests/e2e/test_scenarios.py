@@ -210,17 +210,14 @@ class Scenarios(unittest.TestCase):
     # 6 ─ 서버 다시 정상 작동 → Readiness 확인 후 점진적 복귀 (10→25→50→100%)
     def test_s6_gradual_return_after_recovery(self):
         before = restarts("app3")
-        docker("kill", *SERVERS)
-        wait_until(lambda: gateway()["mode"] == "emergency", 20, "gateway in emergency mode")
-        code, body = http("GET", f"{GATEWAY}/work?priority=normal")
-        self.assertEqual(code, 503, body)
-        self.assertIn("emergency", body["detail"])
-        code, body = http("GET", f"{GATEWAY}/work?priority=critical")
-        self.assertNotIn("emergency", str(body.get("detail", "")), "critical requests must still be tried")
-
-        wait_until(all_healthy, RECOVERY_SLO_S + 30, "everything recovered and emergency OFF")
-        wait_until(lambda: http("GET", f"{GATEWAY}/work?ms=10")[0] == 200, 30,
-                   "normal requests are served again")
+        docker("kill", "app3")
+        wait_until(recovered_again("app3", before), RECOVERY_SLO_S, "app3 restarted and recovered")
+        calls = get(f"{GATEWAY}/admin/calls")
+        weights = [c["body"]["weight"] for c in calls if c["path"] == "/admin/backends/app3/weight"]
+        self.assertEqual(weights[-4:], [10, 25, 50, 100], f"weights sent: {weights}")
+        ramp = [e for e in events({"state_change"}, self.t0)
+                if e["server"] == "app3" and e["new"] == "WARMING"]
+        self.assertTrue(ramp, "went through WARMING before HEALTHY")
 
     # 7 ─ 모든 App 서버 다운 → Emergency + 관리자 경고 (503 응답은 Person 2의 Gateway)
     def test_s7_all_servers_down(self):
@@ -251,6 +248,23 @@ class Scenarios(unittest.TestCase):
         docker("kill", "app2")
         wait_until(recovered_again("app2", before), RECOVERY_SLO_S, "app2 recovered with no AI involved")
         self.assertFalse(events({"warning"}, self.t0), "no AI warnings were involved")
+
+
+    # Week 10 ─ 장애 기록: 장애 하나가 시작부터 끝까지 한 줄로 남는다
+    def test_s9_incident_is_recorded_with_duration(self):
+        before = restarts("app2")
+        docker("kill", "app2")
+        wait_until(recovered_again("app2", before), RECOVERY_SLO_S, "app2 recovered")
+
+        def closed_since():
+            return [i for i in get(f"{CONTROLLER}/incidents")["closed"] if i["started"] >= self.t0]
+
+        inc = wait_until(closed_since, 15, "incident closed")[-1]
+        self.assertIn("app2", inc["servers"])
+        self.assertGreaterEqual(inc["restarts"], 1)
+        self.assertGreater(inc["duration_s"], 0)
+        self.assertIn("recovered", [e["type"] for e in inc["timeline"]])
+        print(f"\n    incident {inc['id']} lasted {inc['duration_s']}s")
 
 
 class EarlyWarning(unittest.TestCase):
