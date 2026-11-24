@@ -24,6 +24,21 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests/unit -v
 
+  person3:
+    name: Person 3 (monitoring, load tests, MTTR, AI, experiments)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-p3.txt
+      - name: Lint
+        run: ruff check ai experiments loadtest monitoring tests/p3 --select E,F,I,B,UP --line-length 110
+      - name: Tests (no Docker needed)
+        run: python -m pytest -q tests/p3
+      - name: Dashboard is up to date
+        run: python scripts/gen_dashboard.py && git diff --exit-code grafana/
+
   chaos:
     name: Chaos scenarios (real Docker stack)
     needs: unit                 # only runs if unit tests passed

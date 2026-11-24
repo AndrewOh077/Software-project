@@ -10,3 +10,14 @@ scrape_configs:
   - job_name: controller
     static_configs:
       - targets: ["controller:9100"]
+
+  # Person 3: the gateway's JSON /metrics, re-served as Prometheus text (monitoring/gateway_exporter.py)
+  - job_name: gateway
+    static_configs:
+      - targets: ["gateway-exporter:9101"]
+
+  # Person 3: AI early warning (`python -m ai.anomaly watch` runs on your machine, not in Docker).
+  # Shows DOWN in "Server status" until you start it. That's expected.
+  - job_name: ai
+    static_configs:
+      - targets: ["host.docker.internal:8010"]
