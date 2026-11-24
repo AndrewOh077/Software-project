@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from controller.adapters import Probe  # noqa: E402
 from controller.config import Config  # noqa: E402
 from controller.core import Controller, State  # noqa: E402
-from controller.events import EventLog  # noqa: E402
+from controller.events import EventLog, IncidentTracker  # noqa: E402
 
 
 class Clock:
@@ -95,7 +95,7 @@ def make(cfg=None, **world_kw):
         cfg or Config(),
         {n: f"http://{n}:8000" for n in world.live},
         prober=world, docker=world, gateway=gw, events=events, alerter=alerts,
-        clock=clock, async_restart=False,
+        incidents=IncidentTracker(events, None, wall=clock), clock=clock, async_restart=False,
     )
     return c, world, gw, alerts, clock
 
@@ -355,6 +355,85 @@ class TestHangingProbe(unittest.TestCase):
         self.assertEqual(c.servers["app1"].state, State.RESTARTING, "hang counted as failure -> DOWN -> restart")
         self.assertEqual(c.servers["app2"].state, State.HEALTHY)
         hang.set()
+
+
+class TestIncidents(unittest.TestCase):
+    """Week 10: incident log."""
+
+    def test_one_server_failure_is_one_incident_with_duration(self):
+        c, world, gw, alerts, clock = make()
+        run(c, clock, 2)
+        world.kill("app3")
+        run(c, clock, 3)
+        self.assertIsNotNone(c.incidents.current, "incident open while app3 is down")
+        self.assertEqual(c.status()["incident"]["servers"], ["app3"])
+        run(c, clock, 40)
+        self.assertIsNone(c.incidents.current)
+        self.assertEqual(len(c.incidents.closed), 1)
+        inc = c.incidents.closed[0]
+        self.assertEqual(inc["servers"], ["app3"])
+        self.assertEqual(inc["restarts"], 1)
+        self.assertFalse(inc["emergency"])
+        self.assertGreater(inc["duration_s"], 0)
+        types_in_timeline = [e["type"] for e in inc["timeline"]]
+        self.assertIn("server_down", types_in_timeline)
+        self.assertIn("recovered", types_in_timeline)
+
+    def test_all_down_is_a_single_emergency_incident(self):
+        cfg = Config(exit_stable_s=5)
+        c, world, gw, alerts, clock = make(cfg)
+        run(c, clock, 2)
+        for n in ("app1", "app2", "app3"):
+            world.kill(n)
+        run(c, clock, 60)
+        self.assertEqual(len(c.incidents.closed), 1, "three servers failing together = one incident")
+        inc = c.incidents.closed[0]
+        self.assertTrue(inc["emergency"])
+        self.assertEqual(sorted(inc["servers"]), ["app1", "app2", "app3"])
+        self.assertEqual(c.incidents.total, 1)
+
+    def test_incident_stays_open_while_quarantined(self):
+        cfg = Config(max_restarts=2, ready_timeout_s=3, backoff_base_s=1, exit_stable_s=5)
+        c, world, gw, alerts, clock = make(cfg)
+        run(c, clock, 2)
+        world.broken_forever.add("app1")
+        world.kill("app1")
+        run(c, clock, 60)
+        self.assertIsNotNone(c.incidents.current, "a quarantined server is not resolved")
+        world.broken_forever.discard("app1")
+        c.release("app1")
+        run(c, clock, 40)
+        self.assertIsNone(c.incidents.current)
+        self.assertEqual(c.incidents.closed[-1]["servers"], ["app1"])
+
+    def test_suspect_blip_is_not_an_incident(self):
+        c, world, gw, alerts, clock = make()
+        run(c, clock, 2)
+        world.ready["app2"] = False
+        run(c, clock, 1)
+        world.ready["app2"] = True
+        run(c, clock, 3)
+        self.assertEqual(c.incidents.total, 0)
+
+    def test_incidents_file_and_metrics(self):
+        import json
+        import tempfile
+        path = os.path.join(tempfile.mkdtemp(), "incidents.jsonl")
+        clock = Clock()
+        world = FakeWorld(clock)
+        events = EventLog(None, wall=clock)
+        c = Controller(Config(), {n: f"http://{n}:8000" for n in world.live}, prober=world, docker=world,
+                       gateway=FakeGateway(), events=events, alerter=FakeAlerter(),
+                       incidents=IncidentTracker(events, path, wall=clock), clock=clock, async_restart=False)
+        run(c, clock, 2)
+        world.kill("app2")
+        run(c, clock, 40)
+        with open(path) as f:
+            lines = [json.loads(line) for line in f]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["servers"], ["app2"])
+        self.assertIn("controller_incidents_total 1", c.metrics())
+        self.assertIn("controller_incident_open 0", c.metrics())
 
 
 class TestGatewayDown(unittest.TestCase):
