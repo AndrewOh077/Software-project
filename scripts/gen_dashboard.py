@@ -66,6 +66,18 @@ panels = [
     # ---- Early warning (Week 8)
     panel(11, "Early warnings received (last 5m)",
           [("increase(controller_warnings_total[5m])", "{{server}}")], 0, 44, w=24),
+    # ---- Gateway (Person 2's limits; read through monitoring/gateway_exporter.py)
+    panel(12, "Gateway: concurrency limit (AIMD) vs in flight",
+          [("gateway_concurrency_limit", "limit"), ("gateway_inflight", "in flight"),
+           ("gateway_concurrency_max", "max")], 0, 52),
+    panel(13, "Gateway: traffic weight per server / emergency mode",
+          [("gateway_backend_weight", "{{server}}"), ("gateway_emergency_mode * 100", "emergency")],
+          12, 52),
+    # ---- AI early warning (Person 3, `python -m ai.anomaly watch`)
+    panel(14, "AI: how far above normal (z-score; 3 = alarm line)",
+          [("max by (server) (ai_anomaly_zscore)", "{{server}}")], 0, 60),
+    panel(15, "AI: says sick (1) / OK (0)",
+          [("ai_anomaly_flag", "{{server}}")], 12, 60),
 ]
 
 dashboard = {

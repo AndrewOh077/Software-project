@@ -47,7 +47,23 @@ services:
   gateway:
     build: ./gateway
     container_name: gateway
+    environment:
+      # Person 3's 3-mode experiment turns protection off for Mode A (see docs/experiments.md).
+      # Unset = the gateway's own defaults.
+      RATE_LIMIT_RPS: "${RATE_LIMIT_RPS:-50}"
+      CONCURRENCY_PER_BACKEND: "${CONCURRENCY_PER_BACKEND:-30}"
+      AIMD_DECREASE_FACTOR: "${AIMD_DECREASE_FACTOR:-0.5}"
     ports: ["8080:8080"]
+    networks: [platform]
+
+  # ---------------------------------------------------------------- Person 3: monitoring
+  gateway-exporter:
+    image: python:3.12-slim
+    container_name: gateway-exporter
+    command: ["python", "/exporter.py"]
+    environment: { GATEWAY_URL: "http://gateway:8080" }
+    volumes: ["./monitoring/gateway_exporter.py:/exporter.py:ro"]
+    depends_on: [gateway]
     networks: [platform]
 
   prometheus:
@@ -56,6 +72,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports: ["9090:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]   # reaches the AI watcher on your machine
     networks: [platform]
 
   grafana:

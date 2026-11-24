@@ -16,7 +16,10 @@
 | `tests/e2e/` | **시나리오 12개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6 |
 | `.github/workflows/ci.yml` | GitHub에 올리면 위 테스트를 자동으로 돌려줌 | 7 |
 | `docs/` | 설명서: Controller 원리, 시나리오 표, 팀원과의 약속(API) | – |
-| `prometheus/`, `grafana/` | 모니터링 (Person 3 담당) | – |
+| `prometheus/`, `grafana/`, `monitoring/` | 모니터링: 숫자 수집 + 대시보드 (Person 3) | 1–3, 7 |
+| `loadtest/` | Locust 부하 테스트: 평소 / 폭주 / 고장 (Person 3) | 1–3 |
+| `experiments/` | MTTR 계산, 3가지 모드 비교 실험, 결과 (Person 3) | 4–5, 11–12 |
+| `ai/` | AI 조기 경고 + 장애 사후 분석 보고서 (Person 3) | 8–10 |
 | `data/` | 기록 파일이 쌓이는 곳 (`events.jsonl`, `chaos.jsonl`, `faults/`) | – |
 
 ## 실행 (Windows)
@@ -250,3 +253,18 @@ curl.exe -X POST http://localhost:8080/admin/backends/app2/enable
 ```powershell
 python -m unittest discover -s tests/e2e -v
 ```
+
+## Person 3: 모니터링, 부하 테스트, AI, 최종 실험
+
+자세한 설명은 `docs/person3.md`. 한 번에 전부:
+
+```powershell
+docker compose up -d --build
+pip install -r requirements-p3.txt
+python experiments/run_all.py        # 약 60분. 빨리: $env:SCENARIO_SCALE="0.3"
+```
+
+→ `experiments/results/report.html`(결과 페이지), `three-mode.md`(표), `postmortems/`(장애 보고서).
+
+<!-- results-summary -->
+
