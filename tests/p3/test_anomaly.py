@@ -109,7 +109,7 @@ def test_score_counts_false_alarms_and_detection_delay():
 
 
 def write_jsonl(path, rows):
-    path.write_text("".join(json.dumps(r) + "\n" for r in rows) + "not json\n")
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows) + "not json\n", encoding="utf-8")
 
 
 def test_load_faults_reads_the_chaos_log(tmp_path):

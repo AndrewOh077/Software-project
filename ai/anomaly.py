@@ -32,7 +32,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -110,14 +110,14 @@ def fetch(prom: str, start: float, end: float) -> list[dict]:
 
 def write_rows(rows: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["ts", "server_id", "req_rate", "err_ratio", "p95_ms"])
         w.writeheader()
         w.writerows(rows)
 
 
 def read_rows(path: Path) -> list[dict]:
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         return [
             {**r, **{k: float(r[k]) for k in ("ts", "req_rate", "err_ratio", "p95_ms")}}
             for r in csv.DictReader(f)
@@ -325,7 +325,7 @@ def warn_controller(controller: str, server: str, score: float, reason: str) -> 
 
 def log_ai(record: dict, data: Path = DATA) -> None:
     data.mkdir(parents=True, exist_ok=True)
-    with (data / "ai.jsonl").open("a") as f:
+    with (data / "ai.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps({"time": round(time.time(), 3), **record}) + "\n")
 
 
@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         print_scores(scores)
         if a.json:
             out = {
-                "created": datetime.now(UTC).isoformat(timespec="seconds"),
+                "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "rows": len(rows),
                 "scores": [{**s.__dict__, "fp_rate": s.fp_rate} for s in scores],
                 "timeline": [
@@ -461,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
                     "step_sec": STEP_SEC,
                 },
             }
-            a.json.write_text(json.dumps(out, indent=1, default=float))
+            a.json.write_text(json.dumps(out, indent=1, default=float), encoding="utf-8")
             print(f"\nsaved {a.json}")
         return 0
 
@@ -473,4 +473,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())

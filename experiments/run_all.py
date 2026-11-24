@@ -94,12 +94,12 @@ def one_run(mode: str, scenario: str, runs: dict) -> None:
     minutes = f"{(time.time() - start) / 60:.2f}"
     run(*AI, "collect", "--minutes", minutes, "--out", str(RAW / f"{name}_metrics.csv"))
     runs[name] = {"start": start, "end": end}
-    (RAW / "runs.json").write_text(json.dumps(runs, indent=1))
+    (RAW / "runs.json").write_text(json.dumps(runs, indent=1), encoding="utf-8")
     time.sleep(10)  # with the 5 s above: rate()[15s] windows forget this run
 
 
 def run_modes(modes: list[str], scenarios: list[str]) -> None:
-    runs = json.loads((RAW / "runs.json").read_text()) if (RAW / "runs.json").exists() else {}
+    runs = json.loads((RAW / "runs.json").read_text(encoding="utf-8")) if (RAW / "runs.json").exists() else {}
     watcher = None
     try:
         for mode in modes:
@@ -155,4 +155,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())

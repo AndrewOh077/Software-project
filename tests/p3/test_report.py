@@ -22,7 +22,7 @@ def run_cli(tmp_path, with_fault: bool):
             {"time": start + 30, "action": "errors", "target": "app3", "ok": True, "rate": 0.3},
             {"time": start + 60, "action": "clear", "target": "app3", "ok": True},
         ]
-    (tmp_path / "chaos.jsonl").write_text("".join(json.dumps(e) + "\n" for e in chaos))
+    (tmp_path / "chaos.jsonl").write_text("".join(json.dumps(e) + "\n" for e in chaos), encoding="utf-8")
     out = tmp_path / "eval.json"
     args = ["evaluate", str(tmp_path / "sick.csv"), "--data", str(tmp_path)]
     assert anomaly.main([*args, "--model", str(model), "--json", str(out)]) == 0
@@ -30,7 +30,7 @@ def run_cli(tmp_path, with_fault: bool):
 
     page = tmp_path / "report.html"
     assert report.main([str(page), f"sick={out}"]) == 0
-    return page.read_text()
+    return page.read_text(encoding="utf-8")
 
 
 def test_report_shows_the_hidden_fault(tmp_path):
@@ -80,10 +80,10 @@ def test_three_modes_section_leads_the_page(tmp_path):
         "kill": {"A": {**r, "errors": 0.10, "mttr_s": None}, "C": {**r, "errors": 0.01, "mttr_s": 14.2}},
         "errors": {"A": {**r, "errors": 0.10, "mttr_s": None}, "C": {**r, "errors": 0.03, "mttr_s": None}},
     }
-    (tmp_path / "modes.json").write_text(json.dumps(modes))
+    (tmp_path / "modes.json").write_text(json.dumps(modes), encoding="utf-8")
     page_path = tmp_path / "final.html"
     assert report.main([str(page_path), f"sick={MODES['file']}", f"modes={tmp_path / 'modes.json'}"]) == 0
-    page = page_path.read_text()
+    page = page_path.read_text(encoding="utf-8")
     assert "Same broken servers. 2.0% errors instead of 10.0%." in page  # weighted over fault runs
     assert '<h2 id="ai-h">' in page and page.count("<h1") == 1  # AI part steps down to h2
     assert "14.2 s" in page and "Rules + AI" in page
