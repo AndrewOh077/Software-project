@@ -46,6 +46,7 @@ http://localhost:9100/incidents 에는 방금 장애가 몇 초 걸렸는지 기
 | `loadtest/` | Locust 부하 테스트: 평소 / 폭주 / 고장 (Person 3) | 1–3 |
 | `experiments/` | MTTR 계산, 3가지 모드 비교 실험, 결과 (Person 3) | 4–5, 11–12 |
 | `ai/` | AI 조기 경고 + 장애 사후 분석 보고서 (Person 3) | 8–10 |
+| `site/` | 프로젝트 웹사이트: 고장 리플레이 + 결과 (Person 3, GitHub Pages) | 12 |
 | `data/` | 기록 파일이 쌓이는 곳 (`events.jsonl`, `incidents.jsonl`, `chaos.jsonl`, `faults/`) | – |
 
 ## 실행 (Windows)
@@ -333,11 +334,13 @@ python experiments/run_all.py        # 약 25분
 
 → `experiments/results/report.html`(결과 페이지), `three-mode.md`(표), `postmortems/`(장애 보고서).
 
+웹사이트(실제 고장 리플레이): `site/index.html` → https://andrewoh077.github.io/Software-project/
+
 최종 결과 (진짜 서비스, 같은 고장 세 번, `docs/experiments.md`):
 
 | | 보호 없음 | 규칙 | 규칙 + AI |
 |---|---|---|---|
-| 고장 때 사용자가 본 에러 | 3.3% | 1.1% | **0.6%** |
-| 죽은 서버 완전 복구 | 안 됨 | 14.1 s | 16.2 s |
-| "살아 있지만 아픈" 서버 알아챔 | 못 함 | 못 함 | **10 s** |
+| 고장 때 사용자가 본 에러 | 3.3% | 0.7% | **0.6%** |
+| 죽은 서버 완전 복구 | 안 됨 | 15.0 s | 16.2 s |
+| "살아 있지만 아픈" 서버 알아챔 | 못 함 | 못 함 | **20 s** |
 

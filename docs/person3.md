@@ -22,6 +22,12 @@ python experiments/run_all.py             # 약 25분: 3가지 모드 x 5가지 
 | `experiments/results/three-mode.md` | 같은 비교를 표로 |
 | `experiments/results/postmortems/*.md` | 장애마다 자동으로 쓴 사후 분석 보고서 (Week 10) |
 | `experiments/results/raw/` | 원본 숫자 (GitHub에는 안 올라감) |
+| `site/` | **프로젝트 웹사이트**: 실제 고장 장면을 다시 보는 리플레이 + 결과 표. `site/index.html`을 브라우저로 열기 |
+
+웹사이트만 다시 만들기: `python experiments/build_site.py` (실험 결과 `raw/`가 있어야 해요).
+main에 올라가면 GitHub Actions(`.github/workflows/pages.yml`)가 자동으로
+https://andrewoh077.github.io/Software-project/ 에 올려요. 처음 한 번만 저장소 관리자(Andrew)가
+Settings → Pages → Source를 "GitHub Actions"로 바꿔야 해요.
 
 ## 주차별로 만든 것
 
