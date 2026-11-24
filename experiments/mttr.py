@@ -4,7 +4,8 @@ Two logs, both written automatically:
   data/chaos.jsonl   chaos/chaos.py   {"time", "action": "kill", "target": "app2", ...}
   data/events.jsonl  the controller   {"time", "type": "server_down" | "recovered", "server", ...}
 
-One incident = a breaking chaos action (kill, stop, pause, sick, break) on a server, then:
+One incident = a breaking chaos action (kill, stop, pause, sick, break) on a server, then, until the
+next chaos action on that server (e.g. a person runs `start`):
   detected   the controller's next `server_down` for that server
   recovered  the controller's next `recovered` for that server (back at 100% traffic)
   MTTR       recovered - broken      detection time = detected - broken
@@ -47,7 +48,7 @@ def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     out = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         try:
             out.append(json.loads(line))
         except json.JSONDecodeError:
@@ -56,12 +57,15 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def find_incidents(chaos: list[dict], events: list[dict]) -> list[Incident]:
-    breaks = [c for c in chaos if c.get("action") in BREAKS and c.get("ok", True)]
+    done = [c for c in chaos if c.get("ok", True)]
     incidents = []
-    for i, c in enumerate(breaks):
+    for i, c in enumerate(done):
+        if c.get("action") not in BREAKS:
+            continue
         inc = Incident(c["target"], c["action"], c["time"])
-        # the next break of the same server ends this incident's search window
-        until = next((b["time"] for b in breaks[i + 1 :] if b["target"] == inc.server), float("inf"))
+        # the next chaos action on this server (a person starting/fixing it, or breaking it again)
+        # ends the window: later controller events are not this incident's self-healing
+        until = next((x["time"] for x in done[i + 1 :] if x["target"] == inc.server), float("inf"))
         for e in events:
             if e.get("server") != inc.server or not inc.broken_at <= e["time"] < until:
                 continue
@@ -113,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if a.csv:
         a.csv.parent.mkdir(parents=True, exist_ok=True)
-        with a.csv.open("w", newline="") as f:
+        with a.csv.open("w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, [*asdict(incidents[0]), "detection_s", "mttr_s"])
             w.writeheader()
             w.writerows({**asdict(i), "detection_s": i.detection_s, "mttr_s": i.mttr_s} for i in incidents)
@@ -121,4 +125,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())

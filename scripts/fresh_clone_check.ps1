@@ -40,7 +40,7 @@ try {
     python -m unittest discover -s tests/unit; Check "unit tests"
 
     Step "stop containers with the same names"
-    docker rm -f app1 app2 app3 controller gateway gateway-mock prometheus grafana 2>$null | Out-Null
+    docker rm -f app1 app2 app3 controller gateway gateway-mock gateway-exporter prometheus grafana 2>$null | Out-Null
 
     Step "build and start (first time: several minutes)"
     docker compose up -d --build; Check "docker compose up"
