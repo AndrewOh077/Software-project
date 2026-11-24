@@ -1,4 +1,4 @@
-# Controller 설명서 (Week 4–8)
+# Controller 설명서 (Week 4–10)
 
 ## 파일별 역할
 
@@ -7,8 +7,8 @@
 | `core.py` | **핵심 두뇌.** 서버 상태를 판단하고 무엇을 할지 결정 |
 | `adapters.py` | 바깥세상과 연결: 서버 검사(HTTP), `docker restart`, Gateway 호출, 알림 |
 | `config.py` | 숫자 설정 (몇 번 실패하면 고장? 몇 번까지 재시작?) |
-| `events.py` | 일어난 일을 `data/events.jsonl`에 기록 |
-| `api.py` | `localhost:9100`: `/status`, `/metrics`, `/events`, `POST /warning`, `POST /admin/release/{서버}` |
+| `events.py` | 일어난 일을 `data/events.jsonl`에, 장애 하나하나를 `data/incidents.jsonl`에 기록 (Week 10) |
+| `api.py` | `localhost:9100`: `/status`, `/metrics`, `/events`, `/incidents`, `POST /warning`, `POST /admin/release/{서버}` |
 | `__main__.py` | 시작점: 전부 연결하고 1초마다 `tick()` 반복 |
 
 ## 서버 하나가 거치는 상태
@@ -124,3 +124,6 @@ Controller는 Gateway에 이 5개를 호출해요. Week 0에 정한 약속과 �
 - `data/events.jsonl`: Controller가 한 일. 예: `{"time": ..., "type": "recovered", "server": "app2", "recovery_s": 9.1}`
 - `data/chaos.jsonl`: chaos 도구로 언제 무슨 장애를 넣었는지 (정답 기록)
 - 복구 시간(MTTR) = chaos.jsonl의 장애 시각부터 events.jsonl의 `recovered` 시각까지
+- `data/incidents.jsonl` (Week 10): 장애 하나당 한 줄. `started`, `ended`, `duration_s`(MTTR), `servers`, `restarts`, `emergency`, `timeline`.
+  장애는 서버가 DOWN이 되거나 비상 모드가 켜질 때 열리고, 모든 서버가 정상 + 비상 모드 해제일 때 닫혀요.
+  `localhost:9100/incidents`로도 볼 수 있어요.

@@ -1,6 +1,30 @@
-# Self-Healing Platform — Person 1 (Week 1–8)
+# Self-Healing Platform — Person 1 (Week 1–12)
 
 서버가 죽으면 **자동으로 알아채고, 트래픽에서 빼고, 다시 살리고, 조금씩 복귀시키는** 시스템.
+
+## 처음부터 따라 하기 (5분)
+
+필요한 것: Docker Desktop, Python 3.10 이상, Git
+
+```powershell
+git clone https://github.com/AndrewOh077/Software-project.git
+cd Software-project
+docker compose up -d --build                  # 처음엔 몇 분 걸려요
+python -m unittest discover -s tests/unit     # 24개 ok
+docker kill app2                              # 서버 하나 죽이기
+```
+
+20초 뒤 http://localhost:9100/status 에서 app2가 다시 `HEALTHY`이고 `restarts_total`이 1이면 성공이에요.
+http://localhost:9100/incidents 에는 방금 장애가 몇 초 걸렸는지 기록돼 있어요.
+
+**측정 결과** (Windows 노트북, Docker Desktop):
+
+| 항목 | 값 |
+|---|---|
+| 고장 감지 | 약 3초 (1초마다 검사, 3번 연속 실패) |
+| 서버 하나 복구 (DOWN 판정 → HEALTHY) | 약 13.5초 (처음 17초에서 개선) |
+| 단위 테스트 | 24개 |
+| 시나리오 테스트 | 13개 (Gateway 포함 3개, 장애 기록 1개 포함) |
 
 ## 폴더에 뭐가 있나
 
@@ -12,12 +36,14 @@
 | `scripts/traffic.py` | 서버에 요청을 계속 보내는 도구 | 3 |
 | `controller/` | **자동 복구 관리자**. 1초마다 서버를 검사하고 고장 나면 살림 | 4–5 |
 | `gateway/` | **실제 Gateway**. 요청 분배와 Controller 관리 명령을 처리 | 1–9 |
-| `tests/unit/` | Controller 판단 로직 테스트 17개 (Docker 필요 없음) | 4–8 |
-| `tests/e2e/` | **시나리오 12개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6 |
+| `tests/unit/` | Controller 판단 로직 테스트 24개 (Docker 필요 없음) | 4–10 |
+| `tests/e2e/` | **시나리오 13개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6–10 |
+| `scripts/fresh_clone_check.*` | 처음부터 받아서 전부 돌아가는지 한 번에 확인 | 11–12 |
+| `mock_gateway/` | 개발용 가짜 Gateway (진짜 Gateway가 생겨서 지금은 안 씀) | 4 |
 | `.github/workflows/ci.yml` | GitHub에 올리면 위 테스트를 자동으로 돌려줌 | 7 |
 | `docs/` | 설명서: Controller 원리, 시나리오 표, 팀원과의 약속(API) | – |
 | `prometheus/`, `grafana/` | 모니터링 (Person 3 담당) | – |
-| `data/` | 기록 파일이 쌓이는 곳 (`events.jsonl`, `chaos.jsonl`, `faults/`) | – |
+| `data/` | 기록 파일이 쌓이는 곳 (`events.jsonl`, `incidents.jsonl`, `chaos.jsonl`, `faults/`) | – |
 
 ## 실행 (Windows)
 
@@ -98,7 +124,7 @@ python -m unittest discover -s tests/e2e -v
 ```
 
 5~8분 걸려요. 마지막에 `OK`가 나오면 성공이에요.
-skip 3개는 Person 2의 Gateway가 있어야 하는 테스트예요. 자세한 표는 `docs/scenarios.md`.
+Gateway 테스트 3개(s1, s3b, s7b)까지 돌리려면 `$env:REAL_GATEWAY="1"`을 먼저 설정하세요. 자세한 표는 `docs/scenarios.md`.
 
 새로 생긴 장애 종류 (4번 시나리오용):
 ```powershell
@@ -127,13 +153,54 @@ curl.exe -X POST localhost:9100/warning -H "Content-Type: application/json" -d '
 
 Person 3에게 줄 사용법은 `docs/controller.md`의 "조기 경고" 부분.
 
+## Week 10: 장애 기록
+
+장애가 하나 날 때마다 **시작 시각, 끝난 시각, 걸린 시간, 어떤 서버였는지, 재시작 몇 번, 비상 모드였는지, 그동안 일어난 일**을 한 줄로 남겨요.
+서버 3개가 한꺼번에 죽어도 장애는 하나로 기록되고, 모든 서버가 정상으로 돌아와야 닫혀요.
+
+```powershell
+docker kill app2
+# 20초 뒤
+curl.exe localhost:9100/incidents
+```
+
+```
+{"id": "INC-1795236720-1", "started": ..., "ended": ..., "duration_s": 13.5,
+ "reason": "app2: not alive", "servers": ["app2"], "restarts": 1, "emergency": false,
+ "timeline": [ {"type": "server_down", ...}, {"type": "restart", ...}, {"type": "recovered", ...} ]}
+```
+
+- 파일: `data/incidents.jsonl` (한 줄에 장애 하나). Person 3이 MTTR 계산과 AI 평가에 써요.
+- 지표: `controller_incident_open`(지금 장애 중이면 1), `controller_incidents_total`
+- `localhost:9100/status`의 `"incident"`에 진행 중인 장애가 보여요.
+
+## Week 11–12: 처음부터 따라 해도 되나? (재현 확인)
+
+GitHub에서 새로 받은 것처럼 임시 폴더에 clone → 빌드 → 단위 테스트 → 시나리오 테스트(진짜 Gateway 포함)까지
+한 번에 돌리고 정리해요. **실행 중인 스택은 멈춰요** (컨테이너 이름이 같아서).
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\fresh_clone_check.ps1
+powershell -ExecutionPolicy Bypass -File scripts\fresh_clone_check.ps1 -Branch person1-week10-12
+```
+
+```bash
+# Mac / Linux
+./scripts/fresh_clone_check.sh
+```
+
+마지막 줄이 `OK: fresh clone of main builds and passes all tests`면 성공이에요.
+GitHub Actions도 push·PR 때 말고 **매주 월요일에 한 번 처음부터 다시 빌드해서** 테스트해요.
+코드를 안 바꿔도 Docker 이미지나 패키지가 업데이트돼서 깨지는 경우를 잡으려는 거예요.
+
 ## 단위 테스트 (Docker 없이도 됨)
 
 ```powershell
 python -m unittest discover -s tests/unit -v
 ```
 
-17개 전부 `ok`면 통과. Controller 코드를 고친 다음엔 항상 돌려보세요.
+24개 전부 `ok`면 통과. Controller 코드를 고친 다음엔 항상 돌려보세요.
 
 ## 설정 바꾸기
 

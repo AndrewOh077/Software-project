@@ -9,7 +9,7 @@ from .adapters import Alerter, DockerCLI, HttpGateway, HttpProber, NullGateway
 from .api import make_server
 from .config import Config, parse_servers
 from .core import Controller
-from .events import EventLog
+from .events import EventLog, IncidentTracker
 
 
 def main() -> None:
@@ -34,6 +34,7 @@ def main() -> None:
         gateway=HttpGateway(gateway_url) if gateway_url else NullGateway(),
         events=events,
         alerter=Alerter(os.getenv("ALERT_WEBHOOK_URL", "")),
+        incidents=IncidentTracker(events, f"{data_dir}/incidents.jsonl"),
     )
 
     port = int(os.getenv("PORT", "9100"))

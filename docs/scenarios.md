@@ -20,6 +20,7 @@ python -m unittest discover -s tests/e2e -v -k s4    # 하나만
 | 7 | 모든 App 서버 다운 | Emergency + 관리자 경고, 전부 복구 후 해제 | `test_s7_all_servers_down` | Person 1 | ✅ |
 | 7b | 〃 | 일반 요청에 503 응답 | `test_s7b_gateway_returns_503_for_normal_requests` | **Person 2** | 자리만 있음 (skip) |
 | 8 | AI 작동 중단 | AI 없이도 규칙만으로 복구 | `test_s8_recovery_works_without_ai` | Person 1 | ✅ |
+| 9 | (Week 10) 장애 기록 | 장애 하나가 시작부터 끝까지, 걸린 시간과 함께 기록됨 | `test_s9_incident_is_recorded_with_duration` | Person 1 | ✅ |
 
 + Week 8 조기 경고: `EarlyWarning` 클래스 2개 ✅
 
