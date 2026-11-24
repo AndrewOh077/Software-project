@@ -261,10 +261,16 @@ python -m unittest discover -s tests/e2e -v
 ```powershell
 docker compose up -d --build
 pip install -r requirements-p3.txt
-python experiments/run_all.py        # 약 60분. 빨리: $env:SCENARIO_SCALE="0.3"
+python experiments/run_all.py        # 약 25분
 ```
 
 → `experiments/results/report.html`(결과 페이지), `three-mode.md`(표), `postmortems/`(장애 보고서).
 
-<!-- results-summary -->
+최종 결과 (진짜 서비스, 같은 고장 세 번, `docs/experiments.md`):
+
+| | 보호 없음 | 규칙 | 규칙 + AI |
+|---|---|---|---|
+| 고장 때 사용자가 본 에러 | 3.3% | 1.1% | **0.6%** |
+| 죽은 서버 완전 복구 | 안 됨 | 14.1 s | 16.2 s |
+| "살아 있지만 아픈" 서버 알아챔 | 못 함 | 못 함 | **10 s** |
 

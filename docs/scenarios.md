@@ -22,6 +22,7 @@ python -m unittest discover -s tests/e2e -v -k s4    # 하나만
 | 8 | AI 작동 중단 | AI 없이도 규칙만으로 복구 | `test_s8_recovery_works_without_ai` | Person 1 | ✅ |
 
 + Week 8 조기 경고: `EarlyWarning` 클래스 2개 ✅
++ Person 3: 시나리오 1·2·5와 "아프지만 살아 있는 서버"를 부하 테스트로 측정하고, AI가 5번(느려짐)을 10초 만에 감지 → `docs/experiments.md`
 
 ## Person 2에게
 - skip된 3개(`s1`, `s3b`, `s7b`)에 `TODO(Person 2)`로 무엇을 확인하면 되는지 적어뒀어요.

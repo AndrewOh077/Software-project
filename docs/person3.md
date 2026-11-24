@@ -8,13 +8,11 @@ Person 1(서버·Controller)과 Person 2(Gateway)가 만든 시스템이 **정�
 ```powershell
 docker compose up -d --build              # 전체 스택 (Grafana: http://localhost:3000)
 pip install -r requirements-p3.txt        # 처음 한 번: Locust, scikit-learn 등
-python experiments/run_all.py             # 약 60분: 3가지 모드 x 5가지 상황 + AI + 보고서
+python experiments/run_all.py             # 약 25분: 3가지 모드 x 5가지 상황 + AI + 보고서
 ```
 
-연습용으로 빨리 (약 20분):
-```powershell
-$env:SCENARIO_SCALE="0.3"; python experiments/run_all.py
-```
+시나리오 하나가 90초예요. 원래 길이(3분, 약 55분)로 돌리려면 `$env:SCENARIO_SCALE="1"`.
+결과만 다시 만들려면 `python experiments/run_all.py --results-only`.
 
 끝나면 이게 생겨요:
 
@@ -48,14 +46,19 @@ e2e 테스트가 그 JSON을 쓰니까 Gateway 코드는 그대로 두고, 옆�
 10%는 `critical`(예: 결제) 요청이라서 Gateway가 절대 막지 않아요.
 
 ```powershell
-python -m locust -f loadtest/scenario_normal.py --headless --host http://localhost:8080   # 20명, 3분
-python -m locust -f loadtest/scenario_spike.py  --headless --host http://localhost:8080   # 10 → 150명
-$env:FAULT="kill"; $env:TARGET="app2"
-python -m locust -f loadtest/scenario_fault.py  --headless --host http://localhost:8080   # 60초에 고장
+$env:SCENARIO="normal"   # normal | spike | kill | errors | slow
+python -m locust -f loadtest/scenario.py --headless --host http://localhost:8080
 ```
 
-`scenario_fault.py`의 `FAULT`: `kill`(서버 죽이기), `errors`(30% 에러, 그래도 "건강함"이라고 대답),
-`slow`(+800 ms). 고장은 Person 1의 `chaos/chaos.py`로 내요. 그래서 `data/chaos.jsonl`에 정답이
+| SCENARIO | 상황 |
+|---|---|
+| `normal` | 20명, 평소 |
+| `spike` | 10 → 150명 1분 동안 (시나리오 1: 요청 제한) |
+| `kill` | 60초에 app2 죽음, 120초에 다시 켬 (시나리오 2) |
+| `errors` | 60~120초 app3가 30% 에러, 그래도 "건강함"이라고 대답 (AI만 볼 수 있음) |
+| `slow` | 60~120초 app3 +800 ms (시나리오 5) |
+
+고장은 Person 1의 `chaos/chaos.py`로 내요. 그래서 `data/chaos.jsonl`에 정답이
 자동으로 남고, MTTR과 AI 채점이 그걸 써요.
 
 ## AI 조기 경고 (Week 8–9)

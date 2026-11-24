@@ -151,7 +151,8 @@ td { padding: var(--space-sm); border-bottom: var(--rule-hair) solid var(--color
 td.num, th.num { text-align: right; }
 td.fig { font-weight: 800; color: var(--color-accent-2); }
 td.none { color: var(--color-rule); }
-.scroll th:first-child, .scroll td:first-child { position: sticky; left: 0; background: var(--color-ink); }
+.board .scroll th:first-child, .board .scroll td:first-child { position: sticky; left: 0; background: var(--color-ink); }
+table.bars th:first-child { position: sticky; left: 0; background: var(--color-paper-3); }
 tr.pick td:first-child { box-shadow: inset 4px 0 0 var(--color-accent); }
 
 .findings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap-columns); }
