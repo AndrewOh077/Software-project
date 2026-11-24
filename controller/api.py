@@ -4,6 +4,7 @@ Small HTTP API for the controller (standard library only).
 GET  /status                 -> every server's state, weight, restarts; emergency flag
 GET  /metrics                -> Prometheus metrics
 GET  /events?limit=100       -> recent events
+GET  /incidents              -> current + recently closed incidents (Week 10)
 POST /warning                -> early warning from the anomaly detector
                                 body: {"server": "app2", "score": 0.93, "reason": "p99 rising"}
 POST /admin/release/{server} -> operator: un-quarantine a server / clear its restart history
@@ -52,6 +53,9 @@ def make_server(controller, host: str = "0.0.0.0", port: int = 9100) -> Threadin
             if u.path == "/events":
                 limit = int(parse_qs(u.query).get("limit", ["100"])[0])
                 return self._send(200, list(controller.events.recent)[-limit:])
+            if u.path == "/incidents":
+                inc = controller.incidents
+                return self._send(200, {"current": inc.current, "closed": list(inc.closed)})
             self._send(404, {"error": "not found"})
 
         def do_POST(self):
