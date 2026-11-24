@@ -36,7 +36,7 @@ step "unit tests (no Docker needed)"
 python3 -m unittest discover -s tests/unit
 
 step "stop containers with the same names"
-docker rm -f app1 app2 app3 controller gateway gateway-mock prometheus grafana >/dev/null 2>&1 || true
+docker rm -f app1 app2 app3 controller gateway gateway-mock gateway-exporter prometheus grafana >/dev/null 2>&1 || true
 
 step "build and start (first time: several minutes)"
 docker compose up -d --build

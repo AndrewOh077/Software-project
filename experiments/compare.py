@@ -37,14 +37,14 @@ def read_run(prefix: Path) -> dict | None:
     stats = Path(f"{prefix}_stats.csv")
     if not stats.exists():
         return None
-    rows = {r["Name"]: r for r in csv.DictReader(stats.open())}
+    rows = {r["Name"]: r for r in csv.DictReader(stats.open(encoding="utf-8"))}
     total, crit = rows.get("Aggregated"), rows.get("/work [critical]")
     if total is None or int(total["Request Count"]) == 0:
         return None
     rejected = errors = 0
     failures = Path(f"{prefix}_failures.csv")
     if failures.exists():
-        for r in csv.DictReader(failures.open()):
+        for r in csv.DictReader(failures.open(encoding="utf-8")):
             n = int(r["Occurrences"])
             if "rejected:" in r["Error"]:
                 rejected += n
@@ -62,7 +62,7 @@ def read_run(prefix: Path) -> dict | None:
 
 
 def collect(raw: Path = RAW, data: Path = DATA) -> dict:
-    runs = json.loads((raw / "runs.json").read_text()) if (raw / "runs.json").exists() else {}
+    runs = json.loads((raw / "runs.json").read_text(encoding="utf-8")) if (raw / "runs.json").exists() else {}
     incidents = find_incidents(read_jsonl(data / "chaos.jsonl"), read_jsonl(data / "events.jsonl"))
     out: dict = {}
     for sc in SCENARIOS:
@@ -125,11 +125,12 @@ def main(argv: list[str] | None = None) -> int:
     text = markdown(results, a.note)
     print(text)
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(text)
-    (a.raw / "three-mode.json").write_text(json.dumps(results, indent=1))
+    a.out.write_text(text, encoding="utf-8")
+    (a.raw / "three-mode.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     print(f"saved {a.out}")
     return 0
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())

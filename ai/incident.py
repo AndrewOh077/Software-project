@@ -291,10 +291,11 @@ def main(argv: list[str] | None = None) -> int:
         record = {"type": "incident_analysis", "server": f.server_id, "incident_start": f.start}
         log_ai({**record, **{k: result.get(k) for k in keep}}, a.data)
         name = f"{datetime.fromtimestamp(f.start):%Y%m%d-%H%M%S}-{f.server_id}.md"
-        (a.out / name).write_text(postmortem(f, s, result))
+        (a.out / name).write_text(postmortem(f, s, result), encoding="utf-8")
         print(f"{f.server_id:<5} {f.kind:<6} -> {result['action']:<17} ({result['analyst']})  {a.out / name}")
     return 0
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())
