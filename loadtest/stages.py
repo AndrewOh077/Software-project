@@ -6,7 +6,7 @@ Each stage is (end_time_sec, users, spawn_rate_per_sec). SCENARIO_SCALE=0.3 shor
 import os
 
 SCALE = float(os.getenv("SCENARIO_SCALE", "1"))
-FAULT_AT, FAULT_END = 60, 120  # scenario_fault.py: break at 60 s, undo at 120 s
+FAULT_AT, FAULT_END = 60, 120  # scenario.py: break at 60 s, undo at 120 s
 
 Stage = tuple[int, int, int]
 

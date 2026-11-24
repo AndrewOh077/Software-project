@@ -330,7 +330,7 @@ METRICS = [  # key, title, format, what "good" means
     ("critical_ok", "Critical requests that worked", "{:.1%}", "higher is better"),
     ("rejected", "Refused on purpose (429)", "{:.1%}", "the gateway saying no to protect the rest"),
     ("p99_ms", "p99 latency", "{:.0f} ms", "lower is better"),
-    ("mttr_s", "Time to full recovery", "{:.1f} s", "lower is better; – = no crash in this run"),
+    ("mttr_s", "Time to full recovery", "{:.1f} s", "lower is better; n/a = nothing crashed in this run"),
 ]
 FAULTS = ("kill", "errors", "slow")
 
@@ -350,7 +350,7 @@ def modes_head(modes: dict) -> str:
     return f"""<section class="head" aria-labelledby="h1">
 <div><h1 id="h1">Same broken servers. {best:.1%} errors instead of {a:.1%}.</h1>
 <p class="lead">The same traffic and the same faults, three times: no protection, the
-team's rules, and the rules with the AI warning them.</p></div>
+team’s rules, and the rules with the AI warning them.</p></div>
 <dl class="plates"><div class="plate"><dt>No protection</dt><dd>{a:.1%}</dd></div>
 <div class="plate ink"><dt>{best_name}</dt><dd>{best:.1%}</dd></div></dl>
 </section>"""
@@ -371,7 +371,7 @@ def modes_section(modes: dict) -> str:
             for m in cols:
                 x = v.get(m, {}).get(key)
                 if x is None:
-                    cells.append(f"<td class='m{m.lower()}'><span class='v'>–</span></td>")
+                    cells.append(f"<td class='m{m.lower()}'><span class='v'>n/a</span></td>")
                     continue
                 cells.append(
                     f"<td class='m{m.lower()}'><span class='v'>{fmt.format(x)}</span>"
@@ -498,7 +498,7 @@ and gets no traffic after that, so the AI has nothing to judge. That is fine.</p
 Forest finds the same faults as a z-score. It should help once we add more numbers.</p></div>
 </section>
 </div></main>
-<footer><div class="container">Made by <code>python experiments/run_all.py</code>: the team's
+<footer><div class="container">Made by <code>python experiments/run_all.py</code>: the team’s
 real app servers, gateway and controller; numbers from Locust and Prometheus.</div></footer>
 <script>{SCRIPT}</script>
 </body>
