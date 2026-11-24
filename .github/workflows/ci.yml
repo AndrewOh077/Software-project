@@ -25,12 +25,14 @@ jobs:
         run: python -m unittest discover -s tests/unit -v
 
   person3:
-    name: Person 3 (monitoring, load tests, MTTR, AI, experiments)
+    name: Person 3 (monitoring, load tests, MTTR, AI, experiments) on Python ${{ matrix.python }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix: { python: ["3.10", "3.12"] }   # README promises 3.10+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with: { python-version: "${{ matrix.python }}" }
       - run: pip install -r requirements-p3.txt
       - name: Lint
         run: ruff check ai experiments loadtest monitoring tests/p3 --select E,F,I,B,UP --line-length 110

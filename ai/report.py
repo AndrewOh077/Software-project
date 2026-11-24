@@ -465,7 +465,7 @@ def render(runs: dict[str, dict], modes: dict | None = None) -> str:
 <link rel="stylesheet"
  href="https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@400;500;800&display=swap">
 <style>
-{CSS.read_text()}
+{CSS.read_text(encoding="utf-8")}
 </style>
 </head>
 <body>
@@ -515,16 +515,17 @@ def main(argv: list[str] | None = None) -> int:
     runs = {}
     for arg in argv[1:]:
         name, path = arg.split("=", 1)
-        runs[name] = json.loads(Path(path).read_text())
+        runs[name] = json.loads(Path(path).read_text(encoding="utf-8"))
     modes = runs.pop("modes", None)  # experiments/compare.py output, optional
     if not runs:
         print("need at least one NAME=eval.json besides modes=")
         return 1
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(runs, modes))
+    out.write_text(render(runs, modes), encoding="utf-8")
     print(f"wrote {out}")
     return 0
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles: same fix as chaos/chaos.py
     sys.exit(main())

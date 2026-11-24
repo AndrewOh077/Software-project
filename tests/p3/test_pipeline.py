@@ -20,7 +20,7 @@ from ai.anomaly import Fault  # noqa: E402
 
 
 def jsonl(path: Path, rows: list[dict]) -> None:
-    path.write_text("".join(json.dumps(r) + "\n" for r in rows) + '{"half a line\n')
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows) + '{"half a line\n', encoding="utf-8")
 
 
 # ---------------------------------------------------------------- Week 4: MTTR
@@ -51,6 +51,20 @@ def test_mttr_pairs_each_break_with_detection_and_recovery():
     }
 
 
+def test_mttr_ignores_controller_events_after_a_person_fixed_it():
+    # Mode A: no controller; chaos `start` brings app2 back; the controller starts much later
+    chaos = [
+        {"time": 100, "action": "kill", "target": "app2", "ok": True},
+        {"time": 160, "action": "start", "target": "app2", "ok": True},
+    ]
+    events = [
+        {"time": 900, "type": "server_down", "server": "app2"},
+        {"time": 910, "type": "recovered", "server": "app2"},
+    ]
+    (inc,) = mttr.find_incidents(chaos, events)
+    assert (inc.detection_s, inc.mttr_s) == (None, None)
+
+
 def test_mttr_cli_skips_broken_lines(tmp_path, capsys):
     jsonl(tmp_path / "chaos.jsonl", [{"time": 1, "action": "kill", "target": "app2", "ok": True}])
     jsonl(
@@ -62,7 +76,7 @@ def test_mttr_cli_skips_broken_lines(tmp_path, capsys):
     )
     assert mttr.main(["--data", str(tmp_path), "--csv", str(tmp_path / "m.csv")]) == 0
     assert "mean MTTR 8" in capsys.readouterr().out
-    assert next(csv.DictReader((tmp_path / "m.csv").open()))["mttr_s"] == "8"
+    assert next(csv.DictReader((tmp_path / "m.csv").open(encoding="utf-8")))["mttr_s"] == "8"
 
 
 # ---------------------------------------------------------------- Week 10: incident assistant
@@ -128,11 +142,13 @@ def locust_csvs(raw: Path, name: str, total: int, fails: dict, crit: tuple, p99:
     head = "Type,Name,Request Count,Failure Count,99%\n"
     nf = sum(fails.values())
     (raw / f"{name}_stats.csv").write_text(
-        head + f"GET,/work [critical],{crit[0]},{crit[1]},50\n,Aggregated,{total},{nf},{p99}\n"
+        head + f"GET,/work [critical],{crit[0]},{crit[1]},50\n,Aggregated,{total},{nf},{p99}\n",
+        encoding="utf-8",
     )
     (raw / f"{name}_failures.csv").write_text(
         "Method,Name,Error,Occurrences\n"
-        + "".join(f"GET,/work [normal],CatchResponseError('{k}'),{v}\n" for k, v in fails.items())
+        + "".join(f"GET,/work [normal],CatchResponseError('{k}'),{v}\n" for k, v in fails.items()),
+        encoding="utf-8",
     )
 
 
@@ -142,7 +158,8 @@ def test_compare_splits_errors_from_refusals_and_finds_mttr(tmp_path):
     locust_csvs(raw, "A-kill", 1000, {"error:503": 100}, (100, 10), 900)
     locust_csvs(raw, "B-kill", 1000, {"error:503": 5, "rejected:429": 20}, (100, 0), 400)
     (raw / "runs.json").write_text(
-        json.dumps({"A-kill": {"start": 0, "end": 180}, "B-kill": {"start": 500, "end": 680}})
+        json.dumps({"A-kill": {"start": 0, "end": 180}, "B-kill": {"start": 500, "end": 680}}),
+        encoding="utf-8",
     )
     jsonl(
         data / "chaos.jsonl",

@@ -1,7 +1,7 @@
 # Person 3 tools: load tests, AI early warning, experiments, their tests.
 # These run on your machine (not in Docker):  pip install -r requirements-p3.txt
 -r loadtest/requirements.txt
-scikit-learn==1.9.1
+scikit-learn>=1.5   # any recent version; 1.9 needs Python 3.11+, the team supports 3.10
 numpy>=2.0
 prometheus-client==0.21.1
 pytest==8.3.3
