@@ -10,6 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "experiments"), str(ROOT / "loadtest"), str(ROOT / "monitoring")]
 
+import build_site  # noqa: E402
 import compare  # noqa: E402
 import gateway_exporter  # noqa: E402
 import mttr  # noqa: E402
@@ -218,3 +219,33 @@ def test_every_scenario_lasts_three_minutes_then_stops(shape):
 
 def test_spike_is_fifteen_times_calm():
     assert stages.users_at(stages.spike(), 90)[0] == 15 * stages.users_at(stages.spike(), 30)[0]
+
+
+# ---------------------------------------------------------------- website (site/)
+
+
+def test_site_rows_weight_errors_by_requests_and_mark_the_best(tmp_path, monkeypatch):
+    run = lambda req, err, ok, mttr=None: {"requests": req, "errors": err, "critical_ok": ok, "mttr_s": mttr}  # noqa: E731
+    results = {
+        "kill": {"A": run(100, 0.10, 0.9), "B": run(100, 0.02, 0.99, 14.0), "C": run(100, 0.01, 0.99, 16.0)},
+        "errors": {"A": run(300, 0.02, 0.97), "B": run(300, 0.01, 0.99), "C": run(300, 0.01, 1.0)},
+    }
+    assert build_site.weighted(results, "A", "errors") == pytest.approx((10 + 6) / 400)
+    assert build_site.weighted(results, "X", "errors") is None
+    (tmp_path / "B-errors_eval.json").write_text(
+        json.dumps({"scores": [{"method": "z-score", "k": 2, "faults": [{"ai_detect_sec": 10}]}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(build_site, "RAW", tmp_path)
+    html = build_site.rows(results)
+    assert "<td>4.0%</td>" in html  # A: 16 of 400 requests failed
+    assert '<td class="best">14 s</td>' in html and "<td>never</td>" in html
+    assert '<td class="best">10 s</td>' in html
+
+
+def test_site_words_skip_events_the_replay_does_not_show():
+    assert build_site.words("chaos", {"action": "kill", "target": "app2"}) == "app2 crashes (chaos tool)"
+    assert build_site.words("controller", {"type": "state_change", "server": "app2"}) is None
+    assert build_site.words("controller", {"type": "ramp", "server": "app2", "weight": 25}).endswith(
+        "25% of its traffic"
+    )
