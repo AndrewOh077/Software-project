@@ -5,3 +5,9 @@ __pycache__/
 data/*.jsonl
 data/faults/*.broken
 artifacts/
+
+# Person 3: raw experiment output and the trained AI model (rebuilt by experiments/run_all.py)
+experiments/results/raw/
+ai/models/*.pkl
+.pytest_cache/
+.ruff_cache/
