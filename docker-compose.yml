@@ -1,10 +1,10 @@
 x-app: &app
   build: ./app
-  restart: "no"   # 일부러 끔: 자동 복구는 Docker가 아니라 우리 controller가 함
+  restart: "no"   # off on purpose: auto-recovery is done by our controller, not Docker
   environment: &app-env
     READY_DELAY_S: "3"
   volumes:
-    - ./data/faults:/faults:ro   # chaos.py break/fix 가 여기에 파일을 만들고 지움
+    - ./data/faults:/faults:ro   # chaos.py break/fix creates and deletes files here
   networks: [platform]
 
 services:
@@ -34,14 +34,14 @@ services:
       SERVERS: "app1=http://app1:8000,app2=http://app2:8000,app3=http://app3:8000"
       GATEWAY_URL: "http://gateway:8080"
       DATA_DIR: "/data"
-      READY_TIMEOUT_S: "15"      # 재시작 후 15초 안에 안 살아나면 실패로 봄
-      # ALERT_WEBHOOK_URL: "https://discord.com/api/webhooks/..."   # 선택: 알림을 Discord로
+      READY_TIMEOUT_S: "15"      # counts as failed if not alive within 15 s after restart
+      # ALERT_WEBHOOK_URL: "https://discord.com/api/webhooks/..."   # optional: send alerts to Discord
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock   # 컨테이너를 재시작할 권한
-      - ./data:/data                                 # events.jsonl 저장
+      - /var/run/docker.sock:/var/run/docker.sock   # permission to restart containers
+      - ./data:/data                                 # stores events.jsonl
     ports: ["9100:9100"]
     depends_on: [app1, app2, app3, gateway]
-    restart: unless-stopped   # controller 자신은 Docker가 살려줌
+    restart: unless-stopped   # Docker keeps the controller itself alive
     networks: [platform]
 
   gateway:

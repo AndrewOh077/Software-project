@@ -1,5 +1,5 @@
 """
-Event log + incident tracker (Week 10: 장애 로그 수집기).
+Event log + incident tracker (Week 10: incident log collector).
 
 events.jsonl    — one line per thing that happened (server_down, restart, recovered, ...)
 incidents.jsonl — one line per incident: when it started/ended, which servers, how long (MTTR)

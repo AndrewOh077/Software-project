@@ -1,69 +1,69 @@
 # Self-Healing Platform: 3-Mode Experiment Results (Person 3, Week 11–12)
 
-같은 트래픽, 같은 고장을 **세 번** 돌려서 보호 수준만 바꿨어요. 결과 페이지:
-`experiments/results/report.html` (브라우저로 열기). 표: `experiments/results/three-mode.md`.
+We ran the same traffic and the same failures **three times**, changing only the protection level. Results page:
+`experiments/results/report.html` (open in a browser). Table: `experiments/results/three-mode.md`.
 
-다시 돌리기: `docker compose up -d --build` → `python experiments/run_all.py` (약 25분).
+To rerun: `docker compose up -d --build` → `python experiments/run_all.py` (about 25 minutes).
 
-## 1. 세 가지 모드
+## 1. The three modes
 
-| 모드 | Controller | Gateway | AI |
+| Mode | Controller | Gateway | AI |
 |---|---|---|---|
-| **A: 보호 없음** | 꺼짐 (재시작 안 함) | 요청 제한·동시 처리 제한 끔 (`AIMD_DECREASE_FACTOR=1`) | 없음 |
-| **B: 규칙** | 켜짐 (감지 → 제외 → 재시작 → 10·25·50·100% 복귀) | 기본 설정 (초당 50, 서버당 30, AIMD) | 없음 |
-| **C: 규칙 + AI** | B와 같음 | B와 같음 | 아픈 서버를 보면 Controller에 경고 (30초마다 반복) |
+| **A: No protection** | Off (no restarts) | Rate limit and concurrency limit off (`AIMD_DECREASE_FACTOR=1`) | None |
+| **B: Rules** | On (detect → remove → restart → return at 10·25·50·100%) | Default settings (50/s, 30 per server, AIMD) | None |
+| **C: Rules + AI** | Same as B | Same as B | Warns the Controller when it sees a sick server (repeats every 30 s) |
 
-## 2. 상황 다섯 가지 (각 3분, 20명; spike만 10 → 150명)
+## 2. Five situations (3 minutes each, 20 users; spike only goes 10 → 150 users)
 
-`normal`, `spike`(시나리오 1), `kill`(app2 60초에 죽음, 시나리오 2), `errors`(app3 60~120초 30% 에러,
-그래도 "건강함"), `slow`(app3 +800 ms, 시나리오 5). 부하: `loadtest/scenario.py`, 고장: `chaos/chaos.py`.
+`normal`, `spike` (scenario 1), `kill` (app2 dies at 60 s, scenario 2), `errors` (app3 returns 30% errors from 60–120 s
+while still reporting "healthy"), `slow` (app3 +800 ms, scenario 5). Load: `loadtest/scenario.py`, failures: `chaos/chaos.py`.
 
-## 3. 결과 (2026-11-23, B의 kill/errors는 2026-11-24에 다시 녹화; 진짜 서비스, 2 CPU 테스트 머신)
+## 3. Results (2026-11-23; B's kill/errors re-recorded on 2026-11-24; real services, 2-CPU test machine)
 
-| 상황 | 지표 | A 보호 없음 | B 규칙 | C 규칙 + AI |
+| Situation | Metric | A No protection | B Rules | C Rules + AI |
 |---|---|---|---|---|
-| app2 죽음 | 사용자가 본 에러 | 6.6% | **0.0%** | **0.0%** |
-| | critical 요청 성공 | 93.8% | **100%** | **100%** |
-| | 완전 복구 (MTTR) | 안 됨 (Controller 없음) | 15.0 s | 16.2 s |
-| app3 30% 에러 | 사용자가 본 에러 | 3.5% | 2.2% | **1.8%** |
-| | 일부러 거절 (429) | 0% | 9.2% | 6.9% |
-| | critical 요청 성공 | 95.2% | 96.1% | **97.7%** |
-| 트래픽 폭주 | p99 응답 시간 | 2200 ms | 1400 ms | 920 ms |
-| | 일부러 거절 (429) | 0% | 48.1% | 49.6% |
-| | 처리한 요청 수 | 6,602 | 10,095 | 10,217 |
-| app3 느려짐 | p99 응답 시간 | 1100 ms | 1100 ms | 1100 ms |
+| app2 dies | Errors users saw | 6.6% | **0.0%** | **0.0%** |
+| | Critical request success | 93.8% | **100%** | **100%** |
+| | Full recovery (MTTR) | never (no Controller) | 15.0 s | 16.2 s |
+| app3 30% errors | Errors users saw | 3.5% | 2.2% | **1.8%** |
+| | Deliberately rejected (429) | 0% | 9.2% | 6.9% |
+| | Critical request success | 95.2% | 96.1% | **97.7%** |
+| Traffic spike | p99 response time | 2200 ms | 1400 ms | 920 ms |
+| | Deliberately rejected (429) | 0% | 48.1% | 49.6% |
+| | Requests handled | 6,602 | 10,095 | 10,217 |
+| app3 slows down | p99 response time | 1100 ms | 1100 ms | 1100 ms |
 
-고장 세 가지를 합치면 사용자가 본 에러: **A 3.3% → B 0.7% → C 0.6%**.
+Across the three failures combined, errors users saw: **A 3.3% → B 0.7% → C 0.6%**.
 
-AI만 따로 (Mode B 기록으로 채점, AI가 아무것도 안 하는 상태):
+AI on its own (scored on Mode B logs, where the AI takes no action):
 
-| 고장 | AI가 알아챈 시간 | Controller health check | 잘못된 알람 |
+| Failure | Time for AI to notice | Controller health check | False alarms |
 |---|---|---|---|
-| app3 30% 에러 | 20 s | 못 알아챔 | 0 |
-| app3 느려짐 | 10 s | 못 알아챔 | 0 |
-| app2 죽음 | – (트래픽이 끊겨 판단할 숫자 없음) | 1.0 s | 0 |
+| app3 30% errors | 20 s | never noticed | 0 |
+| app3 slows down | 10 s | never noticed | 0 |
+| app2 dies | – (traffic stops, so no numbers to judge) | 1.0 s | 0 |
 
-## 4. 알게 된 것
+## 4. What we learned
 
-1. **죽은 서버는 규칙이 잡아요.** Controller가 1초 만에 알아채고 15초 안에 복구. 보호가 없으면
-   다시 켜질 때까지 계속 에러가 나요.
-2. **"살아 있지만 아픈" 서버는 AI만 봐요.** 30% 에러를 내도 `/health`는 OK라서 Controller는 끝까지
-   몰라요. AI는 20초 만에 알아채고, 경고를 받은 Controller가 트래픽을 줄여서 에러가 2.2% → 1.8%.
-3. **폭주 때 Gateway 제한이 나머지를 지켜요.** 절반 가까이를 429로 빨리 거절해서 p99가 2.2초 → 0.9~1.4초,
-   처리한 요청은 더 많고, critical 요청은 하나도 안 막혀요.
-4. **느린 서버는 아직 개선 여지가 있어요.** AI는 10초 만에 알아채지만, 트래픽을 50%로만 줄여서 가장
-   느린 1%(p99)는 그대로예요.
+1. **The rules catch dead servers.** The Controller notices within 1 second and recovers within 15 seconds. Without protection,
+   errors continue until the server is turned back on.
+2. **Only the AI sees "alive but sick" servers.** Even while returning 30% errors, `/health` is OK, so the Controller never
+   finds out. The AI notices in 20 seconds, and the warned Controller cuts traffic, bringing errors from 2.2% → 1.8%.
+3. **During a spike, the Gateway limits protect everything else.** By quickly rejecting nearly half with 429, p99 drops from 2.2 s → 0.9–1.4 s,
+   more requests get handled, and not a single critical request is blocked.
+4. **Slow servers still have room for improvement.** The AI notices in 10 seconds, but traffic is only cut to 50%, so the
+   slowest 1% (p99) stays the same.
 
-## 5. 팀원에게 (실험에서 찾은 것)
+## 5. For teammates (findings from the experiment)
 
-- **Person 2 (Gateway):** AIMD가 **실패 응답 하나마다** 동시 처리 한도를 절반으로 줄여요. 서버 하나가
-  30% 에러를 내면 건강한 서버로 갈 요청까지 9% 거절돼요 (B의 errors 줄). 서버별로 줄이거나, 짧은 시간
-  모아서 줄이면 좋아질 것 같아요.
-- **Person 1 (Controller):** 경고 시 50%는 "느린 서버"에는 부족해요 (p99 그대로). 경고 점수(`score`)에
-  따라 더 줄이는 걸 고려해볼 수 있어요. AI는 이제 30초마다 경고를 다시 보내요 (`warn_duration_s`에 맞춤).
+- **Person 2 (Gateway):** AIMD halves the concurrency limit **on every single failed response**. When one server
+  returns 30% errors, even requests bound for healthy servers get rejected 9% of the time (B's errors row). Reducing per server,
+  or batching failures over a short window before reducing, would likely help.
+- **Person 1 (Controller):** 50% on warning isn't enough for "slow servers" (p99 unchanged). Consider cutting further
+  based on the warning `score`. The AI now resends warnings every 30 seconds (matching `warn_duration_s`).
 
-## 6. 한계
+## 6. Limitations
 
-- 테스트 머신이 CPU 2개라서 응답 시간 숫자는 **이 표 안에서만 비교**하세요 (한 요청 자체는 65 ms).
-- 각 상황을 한 번씩만 돌렸어요. 1% 이하의 차이(예: kill에서 B 15.0 s vs C 16.2 s; 같은 B를 두 번 돌리면 14.1 s와 15.0 s)는 우연일 수 있어요.
-- App 서버는 일을 `sleep`으로 흉내 내서 폭주해도 CPU가 터지지 않아요. 진짜 서비스라면 A의 폭주가 더 나빠요.
+- The test machine has 2 CPUs, so compare response-time numbers **only within this table** (a single request itself takes 65 ms).
+- Each situation was run only once. Differences of 1% or less (e.g. kill: B 15.0 s vs C 16.2 s; running the same B twice gave 14.1 s and 15.0 s) may be chance.
+- The app servers simulate work with `sleep`, so the CPU doesn't blow up under a spike. For a real service, A's spike would be worse.

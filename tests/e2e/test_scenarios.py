@@ -123,7 +123,7 @@ class Scenarios(unittest.TestCase):
         wait_until(all_healthy, 120, "system calm before test")
         self.t0 = status()["server_time"]   # container clock (may differ from this PC's clock)
 
-    # 1 ─ 사용자 갑자기 증가 → Rate Limiting 적용  (Person 2)
+    # 1 ─ Sudden user surge → apply rate limiting  (Person 2)
     @unittest.skipUnless(REAL_GATEWAY, "Person 2: needs real Gateway rate limiting")
     def test_s1_traffic_spike_is_rate_limited(self):
         def call(priority):
@@ -141,7 +141,7 @@ class Scenarios(unittest.TestCase):
         self.assertEqual(set(critical), {200}, f"critical requests must survive the spike: {critical}")
         wait_until(all_healthy, 30, "app servers stay HEALTHY after the spike")
         
-    # 2 ─ Server B 종료 → B 제외 후 A와 C로 트래픽 분배
+    # 2 ─ Server B shuts down → remove B and distribute traffic to A and C
     def test_s2_one_server_killed(self):
         docker("kill", "app2")
         wait_until(lambda: gateway()["backends"]["app2"]["enabled"] is False, 15,
@@ -155,7 +155,7 @@ class Scenarios(unittest.TestCase):
         took = status()["servers"]["app2"]["last_recovery_s"]
         print(f"\n    app2 recovered in {took}s")
 
-    # 3 ─ 서버 2개 동시 종료 → 남은 서버로 버팀 (용량에 맞춘 제한은 Person 2의 AIMD)
+    # 3 ─ Two servers shut down at once → hold up with the remaining server (capacity-based limiting is Person 2's AIMD)
     def test_s3_two_servers_killed(self):
         docker("kill", "app1", "app3")
         # Both must be detected and taken out of the gateway (not necessarily at the same instant:
@@ -181,7 +181,7 @@ class Scenarios(unittest.TestCase):
         wait_until(all_healthy, RECOVERY_SLO_S + 15, "app1+app3 recovered")
         wait_until(lambda: limit() >= full * 0.9, 60, "limit grows back after recovery")
 
-    # 4 ─ 서버 복구 실패 → 재시작 제한 → 격리 + Emergency Mode
+    # 4 ─ Server recovery fails → restart limit → quarantine + Emergency Mode
     def test_s4_recovery_fails_then_emergency(self):
         chaos("break", "app2")      # restarting will NOT fix this
         docker("kill", "app2")
@@ -198,7 +198,7 @@ class Scenarios(unittest.TestCase):
         wait_until(all_healthy, RECOVERY_SLO_S + 20, "app2 back and emergency off")
         self.assertEqual(gateway()["mode"], "normal")
 
-    # 5 ─ 서버 응답속도 저하 → 재시작하지 않음 (느린 건 고장이 아님; 감지/제한은 Person 2·3)
+    # 5 ─ Server response slows down → don't restart (slow isn't broken; detection/limiting is Person 2·3)
     def test_s5_slow_server_is_not_restarted(self):
         before = restarts("app1")
         chaos("slow", "app1", "--ms", "800")
@@ -207,7 +207,7 @@ class Scenarios(unittest.TestCase):
         self.assertEqual(restarts("app1"), before, "a slow-but-alive server must not be restarted")
         chaos("clear", "app1")
 
-    # 6 ─ 서버 다시 정상 작동 → Readiness 확인 후 점진적 복귀 (10→25→50→100%)
+    # 6 ─ Server works normally again → gradual return after readiness check (10→25→50→100%)
     def test_s6_gradual_return_after_recovery(self):
         before = restarts("app3")
         docker("kill", "app3")
@@ -219,7 +219,7 @@ class Scenarios(unittest.TestCase):
                 if e["server"] == "app3" and e["new"] == "WARMING"]
         self.assertTrue(ramp, "went through WARMING before HEALTHY")
 
-    # 7 ─ 모든 App 서버 다운 → Emergency + 관리자 경고 (503 응답은 Person 2의 Gateway)
+    # 7 ─ All app servers down → Emergency + admin alert (503 responses are Person 2's Gateway)
     def test_s7_all_servers_down(self):
         docker("kill", *SERVERS)
         wait_until(lambda: status()["emergency"], 20, "emergency mode ON")
@@ -241,7 +241,7 @@ class Scenarios(unittest.TestCase):
         wait_until(lambda: http("GET", f"{GATEWAY}/work?ms=10")[0] == 200, 30,
                    "normal requests are served again")
 
-    # 8 ─ AI 작동 중단 → Rule-based Controller가 계속 보호
+    # 8 ─ AI stops working → rule-based Controller keeps protecting
     def test_s8_recovery_works_without_ai(self):
         # No warnings are sent at all (the AI is "down"). Rules alone must still heal.
         before = restarts("app2")
@@ -250,7 +250,7 @@ class Scenarios(unittest.TestCase):
         self.assertFalse(events({"warning"}, self.t0), "no AI warnings were involved")
 
 
-    # Week 10 ─ 장애 기록: 장애 하나가 시작부터 끝까지 한 줄로 남는다
+    # Week 10 ─ Incident record: each incident is kept as one line from start to end
     def test_s9_incident_is_recorded_with_duration(self):
         before = restarts("app2")
         docker("kill", "app2")
@@ -268,7 +268,7 @@ class Scenarios(unittest.TestCase):
 
 
 class EarlyWarning(unittest.TestCase):
-    """Week 8: Controller에 조기 경고 연결"""
+    """Week 8: early warning hooked up to the Controller"""
 
     def setUp(self):
         wait_until(all_healthy, 120, "system calm before test")

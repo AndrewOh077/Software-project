@@ -1,8 +1,8 @@
 """
-간단한 트래픽 생성기 (Windows/Mac/Linux 모두 됨, 설치할 것 없음).
-세 서버에 번갈아 요청을 보내고, 1초마다 성공/실패 개수를 보여줌.
+Simple traffic generator (works on Windows/Mac/Linux, nothing to install).
+Sends requests to the three servers in turn and shows success/failure counts every second.
 
-  python scripts/traffic.py              # 초당 20개, 60초
+  python scripts/traffic.py              # 20 per second, 60 seconds
   python scripts/traffic.py --rps 50 --seconds 120
 """
 

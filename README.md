@@ -1,170 +1,170 @@
 # Self-Healing Platform — Person 1 (Week 1–12)
 
-서버가 죽으면 **자동으로 알아채고, 트래픽에서 빼고, 다시 살리고, 조금씩 복귀시키는** 시스템.
+A system that, when a server dies, **notices automatically, takes it out of traffic, brings it back up, and returns it gradually**.
 
-## 처음부터 따라 하기 (5분)
+## Follow along from scratch (5 minutes)
 
-필요한 것: Docker Desktop, Python 3.10 이상, Git
+You need: Docker Desktop, Python 3.10 or newer, Git
 
 ```powershell
 git clone https://github.com/AndrewOh077/Software-project.git
 cd Software-project
-docker compose up -d --build                  # 처음엔 몇 분 걸려요
-python -m unittest discover -s tests/unit     # 24개 ok
-docker kill app2                              # 서버 하나 죽이기
+docker compose up -d --build                  # takes a few minutes the first time
+python -m unittest discover -s tests/unit     # 24 ok
+docker kill app2                              # kill one server
 ```
 
-20초 뒤 http://localhost:9100/status 에서 app2가 다시 `HEALTHY`이고 `restarts_total`이 1이면 성공이에요.
-http://localhost:9100/incidents 에는 방금 장애가 몇 초 걸렸는지 기록돼 있어요.
+After 20 seconds, if http://localhost:9100/status shows app2 back at `HEALTHY` with `restarts_total` at 1, it worked.
+http://localhost:9100/incidents records how many seconds that outage took.
 
-**측정 결과** (Windows 노트북, Docker Desktop):
+**Measured results** (Windows laptop, Docker Desktop):
 
-| 항목 | 값 |
+| Item | Value |
 |---|---|
-| 고장 감지 | 약 3초 (1초마다 검사, 3번 연속 실패) |
-| 서버 하나 복구 (DOWN 판정 → HEALTHY) | 약 13.5초 (처음 17초에서 개선) |
-| 단위 테스트 | 24개 |
-| 시나리오 테스트 | 13개 (Gateway 포함 3개, 장애 기록 1개 포함) |
+| Failure detection | about 3 s (checked every second, 3 consecutive failures) |
+| Single server recovery (DOWN → HEALTHY) | about 13.5 s (improved from 17 s initially) |
+| Unit tests | 24 |
+| Scenario tests | 13 (including 3 Gateway tests and 1 incident-record test) |
 
-## 폴더에 뭐가 있나
+## What's in each folder
 
-| 폴더/파일 | 뭐 하는 거 | 주차 |
+| Folder/file | What it does | Week |
 |---|---|---|
-| `app/` | 웹 서버 코드. 같은 코드로 서버 3개(app1~3)를 띄움 | 1–2 |
-| `docker-compose.yml` | 전부를 한 번에 켜는 설정 (출근표) | 1–2 |
-| `chaos/chaos.py` | 서버를 일부러 망가뜨리는 도구 | 3 |
-| `scripts/traffic.py` | 서버에 요청을 계속 보내는 도구 | 3 |
-| `controller/` | **자동 복구 관리자**. 1초마다 서버를 검사하고 고장 나면 살림 | 4–5 |
-| `gateway/` | **실제 Gateway**. 요청 분배와 Controller 관리 명령을 처리 | 1–9 |
-| `tests/unit/` | Controller 판단 로직 테스트 24개 (Docker 필요 없음) | 4–10 |
-| `tests/e2e/` | **시나리오 13개 자동 테스트** (진짜로 서버를 죽이고 확인) | 6–10 |
-| `scripts/fresh_clone_check.*` | 처음부터 받아서 전부 돌아가는지 한 번에 확인 | 11–12 |
-| `mock_gateway/` | 개발용 가짜 Gateway (진짜 Gateway가 생겨서 지금은 안 씀) | 4 |
-| `.github/workflows/ci.yml` | GitHub에 올리면 위 테스트를 자동으로 돌려줌 | 7 |
-| `docs/` | 설명서: Controller 원리, 시나리오 표, 팀원과의 약속(API) | – |
-| `prometheus/`, `grafana/`, `monitoring/` | 모니터링: 숫자 수집 + 대시보드 (Person 3) | 1–3, 7 |
-| `loadtest/` | Locust 부하 테스트: 평소 / 폭주 / 고장 (Person 3) | 1–3 |
-| `experiments/` | MTTR 계산, 3가지 모드 비교 실험, 결과 (Person 3) | 4–5, 11–12 |
-| `ai/` | AI 조기 경고 + 장애 사후 분석 보고서 (Person 3) | 8–10 |
-| `site/` | 프로젝트 웹사이트: 고장 리플레이 + 결과 (Person 3, GitHub Pages) | 12 |
-| `data/` | 기록 파일이 쌓이는 곳 (`events.jsonl`, `incidents.jsonl`, `chaos.jsonl`, `faults/`) | – |
+| `app/` | Web server code. The same code runs three servers (app1–3) | 1–2 |
+| `docker-compose.yml` | Config that starts everything at once | 1–2 |
+| `chaos/chaos.py` | Tool that breaks servers on purpose | 3 |
+| `scripts/traffic.py` | Tool that keeps sending requests to the servers | 3 |
+| `controller/` | **Auto-recovery manager**. Checks servers every second and revives broken ones | 4–5 |
+| `gateway/` | **The real Gateway**. Distributes requests and handles Controller admin commands | 1–9 |
+| `tests/unit/` | 24 tests for the Controller decision logic (no Docker needed) | 4–10 |
+| `tests/e2e/` | **13 automated scenario tests** (really kill servers and check) | 6–10 |
+| `scripts/fresh_clone_check.*` | Checks in one go that a fresh clone builds and runs | 11–12 |
+| `mock_gateway/` | Fake Gateway for development (no longer used now that the real Gateway exists) | 4 |
+| `.github/workflows/ci.yml` | Runs the tests above automatically on GitHub | 7 |
+| `docs/` | Docs: how the Controller works, scenario table, API contract between teammates | – |
+| `prometheus/`, `grafana/`, `monitoring/` | Monitoring: metrics collection + dashboards (Person 3) | 1–3, 7 |
+| `loadtest/` | Locust load tests: normal / spike / failure (Person 3) | 1–3 |
+| `experiments/` | MTTR calculation, three-mode comparison experiment, results (Person 3) | 4–5, 11–12 |
+| `ai/` | AI early warning + incident postmortem reports (Person 3) | 8–10 |
+| `site/` | Project website: failure replay + results (Person 3, GitHub Pages) | 12 |
+| `data/` | Where log files accumulate (`events.jsonl`, `incidents.jsonl`, `chaos.jsonl`, `faults/`) | – |
 
-## 실행 (Windows)
+## Running (Windows)
 
-Docker Desktop을 켜고, 이 폴더에서 터미널을 열어서:
+Start Docker Desktop, open a terminal in this folder, and run:
 
 ```powershell
 docker compose up -d --build
 ```
 
-| 주소 | 내용 |
+| URL | Contents |
 |---|---|
-| http://localhost:8001 | app1 (`{"server":"app1"...}` 나오면 성공) |
-| http://localhost:9100/status | **Controller가 보는 서버 상태** |
-| http://localhost:8080/admin/backends | Gateway의 서버 제외/복귀/비율 상태 |
-| http://localhost:8080/work?ms=50 | Gateway를 통한 사용자 작업 요청 |
-| http://localhost:3000 | Grafana 대시보드 |
+| http://localhost:8001 | app1 (success if you see `{"server":"app1"...}`) |
+| http://localhost:9100/status | **Server status as seen by the Controller** |
+| http://localhost:8080/admin/backends | Gateway's server disabled/enabled/weight state |
+| http://localhost:8080/work?ms=50 | User work request through the Gateway |
+| http://localhost:3000 | Grafana dashboard |
 
-끄기: `docker compose down`
+Shut down: `docker compose down`
 
-## Week 4 확인: 서버 죽이면 알아서 살아나나?
+## Week 4 check: does a killed server come back on its own?
 
-터미널 두 개를 열어요.
+Open two terminals.
 
 ```powershell
-# 터미널 1: controller가 뭘 하는지 실시간으로 보기
+# Terminal 1: watch what the controller is doing in real time
 docker compose logs -f controller
 
-# 터미널 2: app2 죽이기
+# Terminal 2: kill app2
 python chaos/chaos.py kill app2
 python chaos/chaos.py status
 ```
 
-터미널 1에서 이런 순서가 보이면 성공이에요 (약 10초):
+If terminal 1 shows this sequence, it worked (about 10 s):
 
 ```
-HEALTHY → SUSPECT → DOWN        3번 연속 대답 없음 → 고장 판정, Gateway에서 제외
+HEALTHY → SUSPECT → DOWN        no answer 3 times in a row → judged failed, removed from Gateway
 DOWN → RESTARTING               docker restart app2
-RESTARTING → WARMING            다시 살아남, 트래픽 10% → 25% → 50% → 100%
-WARMING → HEALTHY               복구 완료 (recovery_s = 걸린 시간)
+RESTARTING → WARMING            back alive, traffic 10% → 25% → 50% → 100%
+WARMING → HEALTHY               recovery complete (recovery_s = time taken)
 ```
 
-`pause`(얼리기), `notready`(살아 있지만 일 못 함)도 해보세요.
-`notready`는 바로 재시작하지 않고 15초 기다리는 게 정상이에요 (이유는 `docs/controller.md`).
+Also try `pause` (freeze) and `notready` (alive but can't do work).
+For `notready`, it is expected that it waits 15 seconds instead of restarting right away (reason in `docs/controller.md`).
 
-## Week 5 확인: 재시작 제한 + 비상 모드
+## Week 5 check: restart limit + emergency mode
 
-**비상 모드**: 서버 3개를 다 죽이면
+**Emergency mode**: kill all three servers
 
 ```powershell
 docker kill app1 app2 app3
 ```
 
-→ 로그에 `EMERGENCY MODE ON` → 다 살아나고 10초 뒤 `Emergency mode off`.
-http://localhost:8080/admin/backends 에서 `"mode"`가 `emergency` → `normal`로 바뀌는 것도 확인.
+→ The log shows `EMERGENCY MODE ON` → once everything is back, `Emergency mode off` 10 seconds later.
+Also check at http://localhost:8080/admin/backends that `"mode"` changes from `emergency` → `normal`.
 
-**재시작 제한**: 같은 서버를 2분 안에 계속 죽이면
+**Restart limit**: keep killing the same server within 2 minutes
 
 ```powershell
-python chaos/chaos.py kill app3     # 살아나면 또
-python chaos/chaos.py kill app3     # 살아나면 또
-python chaos/chaos.py kill app3     # 살아나면 또
+python chaos/chaos.py kill app3     # once it's back, again
+python chaos/chaos.py kill app3     # once it's back, again
+python chaos/chaos.py kill app3     # once it's back, again
 python chaos/chaos.py kill app3
 ```
 
-→ 4번째에는 더 이상 재시작하지 않고 `QUARANTINED`(격리) + 알림 + 비상 모드.
-사람이 "고쳤다"고 풀어주기 (정상 서버에 쓰면 재시작 기록만 지워요):
+→ On the 4th time it stops restarting: `QUARANTINED` + alert + emergency mode.
+A human releases it after "fixing" it (on a healthy server this only clears the restart history):
 
 ```powershell
 curl.exe -X POST localhost:9100/admin/release/app3
 ```
 
-## Week 6: 시나리오 8개 자동 테스트
+## Week 6: automated tests for the 8 scenarios
 
-계획서의 "실제로 테스트할 상황" 8개를 자동으로 확인해요. 스택이 켜져 있어야 해요.
+Automatically checks the 8 "situations to actually test" from the project plan. The stack must be running.
 
 ```powershell
 python -m unittest discover -s tests/e2e -v
 ```
 
-5~8분 걸려요. 마지막에 `OK`가 나오면 성공이에요.
-Gateway 테스트 3개(s1, s3b, s7b)까지 돌리려면 `$env:REAL_GATEWAY="1"`을 먼저 설정하세요. 자세한 표는 `docs/scenarios.md`.
+Takes 5–8 minutes. If it ends with `OK`, it passed.
+To also run the 3 Gateway tests (s1, s3b, s7b), set `$env:REAL_GATEWAY="1"` first. Full table in `docs/scenarios.md`.
 
-새로 생긴 장애 종류 (4번 시나리오용):
+New failure type (for scenario 4):
 ```powershell
-python chaos/chaos.py break app2   # 재시작해도 안 고쳐지는 고장
-python chaos/chaos.py fix app2     # 사람이 고친 것처럼
+python chaos/chaos.py break app2   # a failure that restarting does not fix
+python chaos/chaos.py fix app2     # as if a human fixed it
 ```
 
 ## Week 7: GitHub Actions
 
-`.github/workflows/ci.yml`이 들어 있어서, GitHub에 올리면 **push나 PR마다 자동으로**
-① 단위 테스트 → ② Docker로 전체를 띄우고 시나리오 테스트를 돌려요.
-결과는 GitHub 저장소의 **Actions** 탭에서 봐요. 초록 ✓ = 통과, 빨간 ✗ = 뭔가 망가짐.
-실패하면 그 실행 페이지 아래 `chaos-run-logs`를 받아서 로그를 볼 수 있어요.
+`.github/workflows/ci.yml` is included, so on GitHub **every push or PR automatically**
+① runs the unit tests → ② starts everything with Docker and runs the scenario tests.
+See the results in the repository's **Actions** tab. Green ✓ = passed, red ✗ = something broke.
+If it fails, download `chaos-run-logs` at the bottom of that run's page to see the logs.
 
-## Week 8: 조기 경고 연결
+## Week 8: early-warning hookup
 
-Person 3의 이상 감지가 "이 서버 곧 문제 생길 것 같아"라고 보내면, Controller가
-**30초 동안 그 서버의 트래픽을 50%로 줄여요.** 재시작은 절대 안 해요 (AI가 틀릴 수도 있으니까).
+When Person 3's anomaly detection sends "this server looks like it's about to have trouble", the Controller
+**cuts that server's traffic to 50% for 30 seconds.** It never restarts it (the AI could be wrong).
 
-직접 보내보기:
+Try sending one yourself:
 ```powershell
 curl.exe -X POST localhost:9100/warning -H "Content-Type: application/json" -d '{\"server\": \"app1\", \"score\": 0.9, \"reason\": \"test\"}'
 ```
-→ http://localhost:8080/admin/backends 에서 app1의 `weight`가 50이 됐다가 30초 뒤 100으로 돌아와요.
-→ http://localhost:9100/status 에서 app1의 `"warned": true`
+→ At http://localhost:8080/admin/backends, app1's `weight` becomes 50, then returns to 100 after 30 seconds.
+→ At http://localhost:9100/status, app1 shows `"warned": true`
 
-Person 3에게 줄 사용법은 `docs/controller.md`의 "조기 경고" 부분.
+Usage for Person 3 is in the "Early warning" section of `docs/controller.md`.
 
-## Week 10: 장애 기록
+## Week 10: incident records
 
-장애가 하나 날 때마다 **시작 시각, 끝난 시각, 걸린 시간, 어떤 서버였는지, 재시작 몇 번, 비상 모드였는지, 그동안 일어난 일**을 한 줄로 남겨요.
-서버 3개가 한꺼번에 죽어도 장애는 하나로 기록되고, 모든 서버가 정상으로 돌아와야 닫혀요.
+For each incident it writes one line with **start time, end time, duration, which servers, number of restarts, whether emergency mode was on, and what happened in between**.
+Even if all three servers die at once, it is recorded as a single incident, and it only closes once every server is healthy again.
 
 ```powershell
 docker kill app2
-# 20초 뒤
+# after 20 seconds
 curl.exe localhost:9100/incidents
 ```
 
@@ -174,14 +174,14 @@ curl.exe localhost:9100/incidents
  "timeline": [ {"type": "server_down", ...}, {"type": "restart", ...}, {"type": "recovered", ...} ]}
 ```
 
-- 파일: `data/incidents.jsonl` (한 줄에 장애 하나). Person 3이 MTTR 계산과 AI 평가에 써요.
-- 지표: `controller_incident_open`(지금 장애 중이면 1), `controller_incidents_total`
-- `localhost:9100/status`의 `"incident"`에 진행 중인 장애가 보여요.
+- File: `data/incidents.jsonl` (one incident per line). Person 3 uses it for MTTR calculation and AI evaluation.
+- Metrics: `controller_incident_open` (1 if an incident is in progress), `controller_incidents_total`
+- The in-progress incident appears under `"incident"` in `localhost:9100/status`.
 
-## Week 11–12: 처음부터 따라 해도 되나? (재현 확인)
+## Week 11–12: does it work from scratch? (reproducibility check)
 
-GitHub에서 새로 받은 것처럼 임시 폴더에 clone → 빌드 → 단위 테스트 → 시나리오 테스트(진짜 Gateway 포함)까지
-한 번에 돌리고 정리해요. **실행 중인 스택은 멈춰요** (컨테이너 이름이 같아서).
+As if freshly downloaded from GitHub: clone into a temp folder → build → unit tests → scenario tests (including the real Gateway),
+all in one go, then clean up. **It stops the running stack** (the container names are the same).
 
 ```powershell
 # Windows
@@ -194,96 +194,96 @@ powershell -ExecutionPolicy Bypass -File scripts\fresh_clone_check.ps1 -Branch p
 ./scripts/fresh_clone_check.sh
 ```
 
-마지막 줄이 `OK: fresh clone of main builds and passes all tests`면 성공이에요.
-GitHub Actions도 push·PR 때 말고 **매주 월요일에 한 번 처음부터 다시 빌드해서** 테스트해요.
-코드를 안 바꿔도 Docker 이미지나 패키지가 업데이트돼서 깨지는 경우를 잡으려는 거예요.
+If the last line is `OK: fresh clone of main builds and passes all tests`, it passed.
+Besides push and PR, GitHub Actions also **rebuilds from scratch once every Monday** and runs the tests.
+This catches breakage from Docker image or package updates even when the code hasn't changed.
 
-## 단위 테스트 (Docker 없이도 됨)
+## Unit tests (no Docker needed)
 
 ```powershell
 python -m unittest discover -s tests/unit -v
 ```
 
-24개 전부 `ok`면 통과. Controller 코드를 고친 다음엔 항상 돌려보세요.
+Passes if all 24 are `ok`. Always run them after changing Controller code.
 
-## 설정 바꾸기
+## Changing settings
 
-`docker-compose.yml`의 controller `environment:`에 추가하면 돼요. 예:
+Add them under the controller's `environment:` in `docker-compose.yml`. For example:
 
-| 설정 | 기본값 | 의미 |
+| Setting | Default | Meaning |
 |---|---|---|
-| `FAIL_THRESHOLD` | 3 | 몇 번 연속 실패하면 고장으로 볼지 |
-| `MAX_RESTARTS` | 3 | 몇 번까지 재시작할지 ... |
-| `RESTART_WINDOW_S` | 120 | ... 몇 초 안에 |
-| `RAMP_WEIGHTS` | 10,25,50,100 | 복귀할 때 트래픽 단계 |
-| `NOT_READY_GRACE_S` | 15 | 살아 있지만 일 못 하는 서버를 몇 초 기다려줄지 |
-| `EXIT_STABLE_S` | 10 | 비상 모드 끄기 전에 몇 초 안정적이어야 하는지 |
-| `READY_TIMEOUT_S` | 15 | 재시작 후 몇 초 안에 살아나야 하는지 |
-| `WARN_WEIGHT` | 50 | 경고 받은 서버의 트래픽 비율 |
-| `WARN_DURATION_S` | 30 | 경고 효과가 몇 초 갈지 |
+| `FAIL_THRESHOLD` | 3 | How many consecutive failures count as a failure |
+| `MAX_RESTARTS` | 3 | How many restarts are allowed ... |
+| `RESTART_WINDOW_S` | 120 | ... within how many seconds |
+| `RAMP_WEIGHTS` | 10,25,50,100 | Traffic steps when returning a server |
+| `NOT_READY_GRACE_S` | 15 | How many seconds to wait for a server that is alive but can't do work |
+| `EXIT_STABLE_S` | 10 | How many seconds things must be stable before emergency mode turns off |
+| `READY_TIMEOUT_S` | 15 | How many seconds a server has to come back after a restart |
+| `WARN_WEIGHT` | 50 | Traffic share for a warned server |
+| `WARN_DURATION_S` | 30 | How many seconds a warning lasts |
 
 # Person 2 — Gateway (Week 1–10)
 
-Gateway는 모든 사용자 요청이 지나가는 **하나뿐인 입구**예요 (`gateway/gateway.py`, FastAPI).
-요청을 app1~3에 나눠주고, 과부하로부터 시스템을 지키고, Controller의 명령대로 서버를 빼거나 되돌려요.
+The Gateway is the **single entry point** that every user request passes through (`gateway/gateway.py`, FastAPI).
+It distributes requests to app1–3, protects the system from overload, and removes or restores servers as the Controller instructs.
 
-> 중요한 설계: Gateway는 **스스로 서버를 제외하지 않아요.** 서버가 고장 났는지 판단하는 건 Controller이고,
-> Gateway는 Controller가 보내는 `disable / enable / weight / mode` 명령만 따라요.
+> Key design point: the Gateway **never removes servers on its own.** Deciding whether a server has failed is the Controller's job;
+> the Gateway only follows the `disable / enable / weight / mode` commands the Controller sends.
 
-## Gateway가 하는 일
+## What the Gateway does
 
-| 기능 | 하는 일 |
+| Feature | What it does |
 |---|---|
-| 가중치 Round robin | `/work` 요청을 켜져 있는(enabled) 서버에 weight 비율대로 돌아가며 전달하고, 서버의 실제 응답을 그대로 돌려줌 |
-| Failover | 서버에 연결이 안 되거나 타임아웃이면 다른 서버로 한 번씩 더 시도. 다 실패하면 `503` |
-| Admin API | Controller가 서버를 제외/복귀/비율 조절하고 모드를 바꾸는 창구 |
-| Rate limiting | Token bucket + 우선순위(`critical`/`normal`/`low`). 한도 초과 시 `429` + `Retry-After: 1` |
-| AIMD 동시 처리 제한 | 동시에 처리하는 요청 수의 상한을 서버 용량에 맞춰 자동 조절. 한도 초과 시 `429` |
-| 비상 모드 | `mode`가 `emergency`이면 `critical` 요청만 받고 나머지는 `503` |
-| 에러 처리 | 아래 표 참고 |
+| Weighted round robin | Forwards `/work` requests in turn to enabled servers in proportion to weight, and returns the server's actual response as-is |
+| Failover | If a server can't be reached or times out, tries each other server once more. If all fail, `503` |
+| Admin API | The interface the Controller uses to disable/enable servers, adjust weights, and change mode |
+| Rate limiting | Token bucket + priority (`critical`/`normal`/`low`). Over the limit: `429` + `Retry-After: 1` |
+| AIMD concurrency limit | Automatically adjusts the cap on concurrent requests to match server capacity. Over the limit: `429` |
+| Emergency mode | When `mode` is `emergency`, only `critical` requests are accepted; the rest get `503` |
+| Error handling | See the table below |
 
-### 요청 우선순위
+### Request priority
 
-`/work?priority=critical`, `/work?priority=normal`(기본), `/work?priority=low`
+`/work?priority=critical`, `/work?priority=normal` (default), `/work?priority=low`
 
-- **critical**: Rate limit과 동시 처리 제한을 건너뛰고 비상 모드에서도 통과해요.
-- **normal**: 토큰이 있으면 통과해요.
-- **low**: 토큰이 버킷 용량의 50% 아래로 내려가면 먼저 거절돼요 (`LOW_PRIORITY_RESERVE`).
+- **critical**: Skips the rate limit and concurrency limit, and passes even in emergency mode.
+- **normal**: Passes if a token is available.
+- **low**: Rejected first once tokens drop below 50% of bucket capacity (`LOW_PRIORITY_RESERVE`).
 
-### AIMD가 동작하는 방식
+### How AIMD works
 
-- 상한 = `CONCURRENCY_PER_BACKEND` × (켜져 있는 서버들의 weight 합 ÷ 100). 서버가 빠지면 상한이 **즉시** 줄어요.
-- 서버가 돌아오면 초당 `AIMD_INCREASE_PER_S`씩 **천천히** 늘어나요 (Additive Increase).
-- 응답이 5xx이거나 서버에 못 닿으면 현재 한도에 `AIMD_DECREASE_FACTOR`를 곱해서 **확 줄여요** (Multiplicative Decrease).
+- Cap = `CONCURRENCY_PER_BACKEND` × (sum of enabled servers' weights ÷ 100). When a server is removed, the cap shrinks **immediately**.
+- When a server comes back, the limit grows **slowly** by `AIMD_INCREASE_PER_S` per second (Additive Increase).
+- If a response is 5xx or a server can't be reached, the current limit is multiplied by `AIMD_DECREASE_FACTOR` to **cut it sharply** (Multiplicative Decrease).
 
-### 에러 처리
+### Error handling
 
-| 상황 | 응답 |
+| Situation | Response |
 |---|---|
-| 한도 초과 (Token bucket) | `429` `rate limit exceeded` |
-| 동시 처리 한도 초과 (AIMD) | `429` `concurrency limit reached` |
-| 비상 모드에서 `critical`이 아닌 요청 | `503` `emergency mode accepts critical requests only` |
-| 켜진 서버가 하나도 없거나 전부 연결 실패 | `503` `no reachable enabled backend` |
-| 없는 서버 이름으로 admin 명령 | `404` |
-| weight가 0–100 정수가 아님 | `400` |
-| 서버가 5xx로 응답 | 그 응답을 그대로 전달 (다른 서버로 재시도하지 않음) |
+| Over the limit (token bucket) | `429` `rate limit exceeded` |
+| Over the concurrency limit (AIMD) | `429` `concurrency limit reached` |
+| Non-`critical` request in emergency mode | `503` `emergency mode accepts critical requests only` |
+| No enabled servers, or all connections failed | `503` `no reachable enabled backend` |
+| Admin command with an unknown server name | `404` |
+| weight is not an integer 0–100 | `400` |
+| Server responds with 5xx | That response is passed through as-is (not retried on another server) |
 
-## 엔드포인트
+## Endpoints
 
-| 주소 | 설명 |
+| Path | Description |
 |---|---|
-| `GET /work` | 사용자 요청. `?priority=`와 나머지 쿼리는 서버로 그대로 전달 |
-| `GET /route` | 다음에 선택될 서버 이름과 주소 확인 (디버깅용) |
-| `GET /health` | Gateway 자신이 살아 있는지 |
-| `GET /admin/backends` | 서버별 `enabled`/`weight`와 현재 `mode` |
-| `POST /admin/backends/{name}/disable` | 서버를 분배에서 제외 |
-| `POST /admin/backends/{name}/enable` | 서버를 다시 포함 |
-| `POST /admin/backends/{name}/weight` | 트래픽 비율 설정 (`{"weight": 0~100}`) |
-| `POST /admin/mode` | `{"mode": "normal"}` 또는 `{"mode": "emergency"}` |
-| `GET /admin/calls` | Controller가 보낸 최근 명령 200개 기록 |
-| `GET /metrics` | 현재 mode, 켜진 서버 수, 동시 처리 한도/상한/진행 중 요청 수 |
+| `GET /work` | User request. `?priority=` and other query params are passed to the server as-is |
+| `GET /route` | Shows the name and address of the next server to be picked (for debugging) |
+| `GET /health` | Whether the Gateway itself is alive |
+| `GET /admin/backends` | Each server's `enabled`/`weight` and the current `mode` |
+| `POST /admin/backends/{name}/disable` | Remove a server from distribution |
+| `POST /admin/backends/{name}/enable` | Include the server again |
+| `POST /admin/backends/{name}/weight` | Set traffic share (`{"weight": 0~100}`) |
+| `POST /admin/mode` | `{"mode": "normal"}` or `{"mode": "emergency"}` |
+| `GET /admin/calls` | Log of the last 200 commands sent by the Controller |
+| `GET /metrics` | Current mode, number of enabled servers, concurrency limit/cap/in-flight requests |
 
-## 실행해 보기
+## Try it
 
 ```powershell
 docker compose up -d --build
@@ -293,7 +293,7 @@ curl.exe http://localhost:8080/admin/backends
 curl.exe http://localhost:8080/metrics
 ```
 
-Controller 없이 직접 명령해 보기:
+Send commands directly, without the Controller:
 
 ```powershell
 curl.exe -X POST http://localhost:8080/admin/backends/app2/disable
@@ -301,46 +301,45 @@ curl.exe -X POST http://localhost:8080/admin/backends/app2/weight -H "Content-Ty
 curl.exe -X POST http://localhost:8080/admin/backends/app2/enable
 ```
 
-## Gateway 설정
+## Gateway settings
 
-`docker-compose.yml`의 `gateway` 서비스에 `environment:`로 추가하면 돼요.
+Add them under `environment:` for the `gateway` service in `docker-compose.yml`.
 
-| 설정 | 기본값 | 의미 |
+| Setting | Default | Meaning |
 |---|---|---|
-| `REQUEST_TIMEOUT` | 3 | 서버 응답을 몇 초까지 기다릴지 |
-| `APP1_URL`, `APP2_URL`, `APP3_URL` | `http://appN:8000` | 각 서버 주소 |
-| `RATE_LIMIT_RPS` | 50 | 초당 허용 요청 수 (토큰이 차오르는 속도) |
-| `RATE_LIMIT_BURST` | 100 | 한꺼번에 받을 수 있는 최대 요청 수 (버킷 크기) |
-| `LOW_PRIORITY_RESERVE` | 0.5 | `low` 요청은 토큰이 버킷의 이 비율 아래면 거절 |
-| `CONCURRENCY_PER_BACKEND` | 30 | 서버 1대당 동시에 처리할 요청 수 |
-| `AIMD_INCREASE_PER_S` | 5 | 한도가 초당 얼마씩 회복되는지 |
-| `AIMD_DECREASE_FACTOR` | 0.5 | 실패 시 한도에 곱하는 값 |
+| `REQUEST_TIMEOUT` | 3 | How many seconds to wait for a server response |
+| `APP1_URL`, `APP2_URL`, `APP3_URL` | `http://appN:8000` | Address of each server |
+| `RATE_LIMIT_RPS` | 50 | Allowed requests per second (token refill rate) |
+| `RATE_LIMIT_BURST` | 100 | Max requests accepted at once (bucket size) |
+| `LOW_PRIORITY_RESERVE` | 0.5 | `low` requests are rejected when tokens are below this fraction of the bucket |
+| `CONCURRENCY_PER_BACKEND` | 30 | Concurrent requests per server |
+| `AIMD_INCREASE_PER_S` | 5 | How much the limit recovers per second |
+| `AIMD_DECREASE_FACTOR` | 0.5 | Multiplier applied to the limit on failure |
 
-## 테스트
+## Tests
 
 ```powershell
 python -m unittest discover -s tests/e2e -v
 ```
 
-## Person 3: 모니터링, 부하 테스트, AI, 최종 실험
+## Person 3: monitoring, load tests, AI, final experiment
 
-자세한 설명은 `docs/person3.md`. 한 번에 전부:
+Details in `docs/person3.md`. Everything in one go:
 
 ```powershell
 docker compose up -d --build
 pip install -r requirements-p3.txt
-python experiments/run_all.py        # 약 25분
+python experiments/run_all.py        # about 25 minutes
 ```
 
-→ `experiments/results/report.html`(결과 페이지), `three-mode.md`(표), `postmortems/`(장애 보고서).
+→ `experiments/results/report.html` (results page), `three-mode.md` (table), `postmortems/` (incident reports).
 
-웹사이트(실제 고장 리플레이): `site/index.html` → https://andrewoh077.github.io/Software-project/
+Website (replay of real failures): `site/index.html` → https://andrewoh077.github.io/Software-project/
 
-최종 결과 (진짜 서비스, 같은 고장 세 번, `docs/experiments.md`):
+Final results (real services, same failures run three times, `docs/experiments.md`):
 
-| | 보호 없음 | 규칙 | 규칙 + AI |
+| | No protection | Rules | Rules + AI |
 |---|---|---|---|
-| 고장 때 사용자가 본 에러 | 3.3% | 0.7% | **0.6%** |
-| 죽은 서버 완전 복구 | 안 됨 | 15.0 s | 16.2 s |
-| "살아 있지만 아픈" 서버 알아챔 | 못 함 | 못 함 | **20 s** |
-
+| Errors users saw during failures | 3.3% | 0.7% | **0.6%** |
+| Full recovery of a dead server | never | 15.0 s | 16.2 s |
+| Detecting an "alive but sick" server | no | no | **20 s** |
